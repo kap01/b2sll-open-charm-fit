@@ -1,0 +1,92 @@
+{
+    "resonances" :  {
+	"psi(3770)" : { 
+	    "channels" : {
+		"DD"     : {
+		    "branching-fraction" : 1.00000000
+		}
+	    },
+	    "mass"  : 3.771,
+	    "width" : 0.025
+	},
+	"psi(4040)" : { 
+	    "channels" : {
+		"DD"     : {
+		    "branching-fraction" : 0.16901408 
+		}, 
+		"DstD"   : {
+		    "branching-fraction" : 0.70422535
+		},
+		"DstDst" : {
+		    "branching-fraction" : 0.12676056
+		}
+	    },
+	    "mass"  : 4.040,
+	    "width" : 0.080
+	},
+	"psi(4160)" : { 
+	    "channels" : { 
+		"DD"     : {
+		    "branching-fraction" : 0.01470588
+		},
+		"DstD"   : {
+		    "branching-fraction" : 0.25000000
+		}, 
+		"DstDst" :{
+		    "branching-fraction" : 0.73529412
+		}
+	    },
+	    "mass"  : 4.190,
+	    "width" : 0.070
+	},
+	"psi(4415)" : { 
+	    "channels" : {
+		"DsDs"   : { 
+		    "branching-fraction" : 1.00000000 
+		}
+	    },
+	    "mass"  : 4.415,
+	    "width" : 0.070
+	}
+    },
+    "channels" : { 
+	"DD" : { 
+	    "M1" : 1.864,
+	    "M2" : 1.864,
+	    "L"  : 1
+	},
+	"DstD" : { 
+	    "M1" : 2.010,
+	    "M2" : 1.864, 
+	    "L"  : 0 
+	},
+	"DstDst" : { 
+	    "M1" : 2.010,
+	    "M2" : 2.010, 
+	    "L"  : 0 
+	},
+	"DsDs"   : { 
+	    "M1" : 1.968,
+	    "M2" : 1.968,
+	    "L"  : 1  
+	}, 
+	"DsstDs" : { 
+	    "M1" : 2.112, 
+	    "M2" : 1.968,
+	    "L"  : 0  
+	},
+	"DsstDsst" : { 
+	    "M1" : 2.112,
+	    "M2" : 2.112,
+	    "L"  : 1
+	},
+	"D1D" : { 
+	    "M1" : 2.422,
+	    "M2" : 1.864, 
+	    "L"  : 0
+	}
+    }, 
+    "data" : "../data/R.root", 
+    "min"  : 3.000, 
+    "max"  : 4.800
+}
