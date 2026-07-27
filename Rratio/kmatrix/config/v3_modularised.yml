@@ -10,7 +10,7 @@
 paths:
   user_path: "/users/sd22284/b2sll_open_charm/repo/Rratio/"
   data_path: "data/ins552757-v1.root"
-  save_path: "4poles_freeUpM4"
+  save_path: "4poles_3groups"
 
 constants:
   z0: 3.0        # Blatt-Weisskopf radius; alternatively give q0 (z0 = 1/q0)
@@ -101,21 +101,12 @@ resonances:
 
   - label: "4"
     mass:
-      start: 4.360
+      start: 4.420
       limits: [4.30, 4.90]
     couplings:
       ee:  {start: 0.40, limits: [-8.0, 8.0]}
       DD:  {start: 0.30, limits: [-8.0, 8.0]}
       Dst: {start: 0.60, limits: [-8.0, 8.0]}
-
-  # - label: "5"
-  #   mass:
-  #     start: 4.420
-  #     limits: [4.40, 4.6]
-  #   couplings:
-  #     ee:  {start: 0.40, limits: [-8.0, 8.0]}
-  #     DD:  {start: 0.30, limits: [-8.0, 8.0]}
-  #     Dst: {start: 0.60, limits: [-8.0, 8.0]}
 
 # ---- non-resonant continuum ---------------------------------------------
 # baseline: the flat R_uds light-quark contribution
@@ -128,4 +119,4 @@ continuum:
     limits: [1.8, 2.6]
   couplings:
     DD:  {start: 0.5, limits: [-4.0, 4.0]}
-    # Dst: {start: 0.3, limits: [-4.0, 4.0]}
+    Dst: {start: 0.3, limits: [-4.0, 4.0]}
