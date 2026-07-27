@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""
+Text report and diagnostic plot for a completed KMatrixFit. Both take the
+ParameterSpec and ChannelSetup as arguments rather than assuming particular
+parameter or channel names, so they work unchanged for any number of
+channels / resonances.
+"""
+
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+
+
+from physics import R_model
+
+mytrapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
+
+plt.rcParams.update({'font.family': 'serif',
+                      'mathtext.fontset': 'stix',
+                      'axes.labelsize': 16,
+                      'xtick.labelsize': 12, 'ytick.labelsize': 12,
+                      'legend.fontsize': 13, 'axes.titlesize': 18,
+                      })
+
+colourList = ["mediumvioletred", "#FF3EB7", "orchid", "whitesmoke", "#8AD291", "limegreen", "#36742D"]
+my_cmap = LinearSegmentedColormap.from_list('my_cmap', colourList)
+
+def report(m, param_spec, data, path=None):
+    x = data[0]
+    ndf = len(x) - m.nfit
+    lines = [
+        "=" * 66,
+        f" MIGRAD valid : {m.valid}     accurate covariance : {m.accurate}",
+        f" chi2         : {m.fval:.2f}",
+        f" ndf          : {ndf}   (N = {len(x)}, free params = {m.nfit})",
+        f" chi2 / ndf   : {m.fval/ndf:.3f}",
+        "-" * 66,
+    ]
+    for name in param_spec.names:
+        lines.append(f"   {name:14s} = {m.values[name]:+9.4f}  +/- {m.errors[name]:.4f}")
+    lines.append("=" * 66)
+
+    text = "\n".join(lines)
+    print(text)
+    if path is not None:
+        with open(path, 'w') as outfile:
+            outfile.write(text + "\n")
+
+
+def make_plot(m, param_spec, setup, data, config, out_pdf=None):
+    plot_lo, plot_hi = config["limits"]["low"], config["limits"]["high"]
+    x_all, y_all, eyl_all, eyh_all = data
+    lo_idx = np.searchsorted(x_all, plot_lo, side='left')
+    hi_idx = np.searchsorted(x_all, plot_hi, side='left')
+    x, y, eyl, eyh = (x_all[lo_idx:hi_idx], y_all[lo_idx:hi_idx],
+                       eyl_all[lo_idx:hi_idx], eyh_all[lo_idx:hi_idx])
+
+    par = np.array([m.values[name] for name in param_spec.names])
+    bare_masses, g, b, baseline = param_spec.unpack(par)
+
+    grid = np.linspace(plot_lo - 0.05, plot_hi + 0.05, 1600)
+    Rtot, Rbase, Rbg = R_model(grid, bare_masses, g, b, baseline, setup)
+
+    ## ---- pull distribution: model integrated over each data bin's width,
+    ## errors use the same asymmetric convention as the fit's cost function
+    data_diffs = np.diff(x)
+    data_edges = np.concatenate(([x[0] - 0.5*data_diffs[0]], 0.5*(x[:-1] + x[1:]),
+                                  [x[-1] + 0.5*data_diffs[-1]]))
+    data_widths = np.diff(data_edges)
+    Rtot_integrals = np.array([
+        mytrapz(Rtot[(grid >= lo) & (grid < hi)], grid[(grid >= lo) & (grid < hi)])
+        for lo, hi in zip(data_edges[:-1], data_edges[1:])
+    ])
+    Rtot_averages = Rtot_integrals / data_widths
+    pull_sigma = np.where(Rtot_averages >= y, eyh, eyl)
+    pulls = (Rtot_averages - y) / pull_sigma
+    pull_colours = ['limegreen' if v <= 1 else 'forestgreen' if 1 < v <= 3
+                     else 'goldenrod' if 3 < v <= 5 else 'crimson' for v in np.abs(pulls)]
+
+    fig, axis = plt.subplots(2, 1, figsize=(11, 7.5), sharex=True,
+                              gridspec_kw={'height_ratios': [3, 1], 'hspace': 0.06})
+    ax = axis[0]
+    ax.errorbar(x, y, yerr=[eyl, eyh], fmt="o", ms=4, color="black",
+                elinewidth=0.8, capsize=1.5, zorder=5, label="data")
+    ax.plot(grid, Rbg, "--", color="lightseagreen", lw=1.3,
+            label=r"non-resonant continuum ($|b|^2$)")
+    ax.plot(grid, Rbase, ":", color="violet", lw=1.2, label="light-quark baseline")
+    ax.plot(grid, Rtot, "-", color="mediumvioletred", lw=2.1,
+            label=r"K-matrix fit ($\chi^2/\mathrm{ndf}=%.2f$)" % (m.fval/(len(x)-m.nfit)))
+
+    ax.set_xlim(plot_lo, plot_hi)
+    # ymin, ymax = ax.get_ylim()
+    # ax.set_ylim(ymin, ymin + (ymax - ymin) * 1.12)   ## headroom for the labels below
+    ax.set_ylim(1.85, 5.2) ## to match prev code
+
+    mass_names = {param_spec.names[i] for i in param_spec.res_mass_idx}
+    for name, val in zip(param_spec.names, par):
+        if name in mass_names:
+            ax.axvline(val, color="darkorange", ls=":", lw=0.8)
+            ax.text(val, ax.get_ylim()[1] * 0.995, "$"+name+"$", ha="right", va='top', fontsize=11, color="darkorange")
+
+    first_mthr = True
+    for i in setup.open_charm_idxs:
+        m_threshold = 2 * setup.masses[i]
+        ax.axvline(m_threshold, color="deepskyblue", ls="-.", lw=0.8)
+        if not(first_mthr) and m_threshold-2*setup.masses[i-1] < 0.05:
+            ax.text(m_threshold, ax.get_ylim()[1] * 0.955, setup.tex[i], ha="left", va='top', fontsize=11, color="deepskyblue")
+        else:
+            ax.text(m_threshold, ax.get_ylim()[1] * 0.955, setup.tex[i], ha="right", va='top', fontsize=11, color="deepskyblue")
+        first_mthr = False
+
+        
+
+    ax.set_ylabel(r"$R = \sigma_{\rm had}/\sigma_{\mu\mu}$")
+    ax.set_title(f"Coupled-channel K-matrix fit ({setup.N_ch} channels, "
+                 f"{len(param_spec.res_mass_idx)} resonances)")
+    ax.legend(loc="lower right")
+
+    axis[1].bar(data_edges[:-1], pulls, width=0.8*data_widths, color=pull_colours,
+                align='edge', edgecolor="none", zorder=5)
+    axis[1].axhline(0., color='black', linewidth=1., zorder=-10)
+    axis[1].axhline(3., color='slategray', linewidth=1., zorder=-10, linestyle='--', alpha=0.5)
+    axis[1].axhline(-3., color='slategray', linewidth=1., zorder=-10, linestyle='--', alpha=0.5)
+    axis[1].set_ylim(-5, 5)
+    axis[1].set_ylabel(r"$(R^{fit} - R^{data}) / \sigma^{data}$")
+    axis[1].set_xlim(plot_lo, plot_hi)
+    axis[1].set_xlabel(r"$\sqrt{s}$  [GeV]", loc='right')
+
+    fig.subplots_adjust(left=0.08, right=0.98, top=0.94, bottom=0.08, hspace=0.06)
+
+    if out_pdf is not None:
+        fig.savefig(out_pdf, bbox_inches='tight')
+        print(f"_INFO_ [plot saved] {out_pdf}")
+        return None
+    else:
+        return fig
+
+
+def couplings_plot(m, param_spec, setup, config, out_pdf=None):
+    """Heatmap of fitted resonance couplings g_{r,c}: rows = resonances
+    (r = 1, 2, 3, ...), columns = coupling groups / channels
+    (c = ee, DD, Dst, ...). Reads resonance labels and group names
+    straight off param_spec.names, so it works for any number of
+    resonances or channels without changes."""
+ 
+    groups = [] ## because some couplings as grouped across channels i.e. D0D0bar and DpDm
+    [groups.append(c) for c in setup.groups if c not in groups] ## using list comprehsnion to preserve the order of the channels from config
+    tex = [config['group_tex'][g] for g in groups]
+    resonances = [param_spec.names[i] for i in param_spec.res_mass_idx]
+    res_m = [np.round(m.values[r], 3) for r in resonances]
+
+    
+    z = np.full((len(resonances), len(groups)), np.nan)
+    for r, l in enumerate(resonances):
+        label = l[2:] ## because they are of the form M_X
+        for c, group in enumerate(groups):
+            name = f"g_{label}_{group}"
+            if name in param_spec.names:
+                z[r, c] = m.values[name]
+ 
+    fig, ax = plt.subplots(figsize=(1.2*len(groups) + 2, 0.9*len(resonances) + 2))
+    vmax = np.nanmax(np.abs(z))
+    im = ax.imshow(z, cmap=my_cmap, vmin=-vmax, vmax=vmax, aspect="auto")
+ 
+    ax.set_xticks(range(len(groups)))
+    ax.set_yticks(range(len(resonances)))
+    # ax.set_yticklabels([f"resonance {label}" for label in labels])
+    ax.set_xticklabels(tex)
+    ax.set_yticklabels([f"${r}$ = {m}" for r,m in zip(resonances, res_m)])
+    ax.set_xlabel("coupling group")
+    ax.set_ylabel("resonance / GeV")
+    ax.set_title(r"Fitted coupling constants $g^{r}_{c}$")
+ 
+    for r in range(len(resonances)):
+        for c in range(len(groups)):
+            if not np.isnan(z[r, c]):
+                ax.text(c, r, f"{z[r, c]:.2f}", ha="center", va="center", fontsize=10,
+                        color="white" if abs(z[r, c]) > 0.6 * vmax else "black")
+ 
+    fig.colorbar(im, ax=ax, label="coupling value")
+    fig.tight_layout()
+ 
+    if out_pdf is not None:
+        fig.savefig(out_pdf, bbox_inches='tight')
+        print(f"_INFO_ [plot saved] {out_pdf}")
+        return None
+    else:
+        return fig
+ 
