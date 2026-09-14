@@ -112,6 +112,12 @@ def validate_config(config):
         if cg not in c_cgs:
             raise ValueError(f"[CONFIG ERROR] coupling group '{cg}' used in resonances but does not belong to any channel")
 
+    ## check fit range specified
+    if config['fit'].get('fit_range') == None:
+        print("[CONFIG WARNING] no fit limits set, using range 0-10 to encompass all expected data points")
+        config['fit']['fit_range'] = {}
+        config['fit']['fit_range']['low'] = 0.
+        config['fit']['fit_range']['high'] = 10.
     
 
     print("[CONFIG INFO] passed validation")
@@ -149,10 +155,13 @@ def build_channel_setup(config):
                          open_charm_idxs=open_charm_idxs, z0=z0)
 
 
-def load_data(path):
+def load_data(path, fit_range):
     g = uproot.open(path)["R"]
-    x = np.asarray(g.values("x"), dtype=float)
-    y = np.asarray(g.values("y"), dtype=float)
-    eyl = np.asarray(g.errors("low", "y"), dtype=float)
-    eyh = np.asarray(g.errors("high", "y"), dtype=float)
+    x_all = np.asarray(g.values("x"), dtype=float)
+    idx_lo = np.searchsorted(x_all, fit_range['low'], side='right')
+    idx_hi = np.searchsorted(x_all, fit_range['high'], side='left')
+    x = x_all[idx_lo:idx_hi]
+    y = np.asarray(g.values("y"), dtype=float)[idx_lo:idx_hi]
+    eyl = np.asarray(g.errors("low", "y"), dtype=float)[idx_lo:idx_hi]
+    eyh = np.asarray(g.errors("high", "y"), dtype=float)[idx_lo:idx_hi]
     return x, y, eyl, eyh

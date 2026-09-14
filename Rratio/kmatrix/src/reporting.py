@@ -27,7 +27,49 @@ plt.rcParams.update({'font.family': 'serif',
 colourList = ["mediumvioletred", "#FF3EB7", "orchid", "whitesmoke", "#8AD291", "limegreen", "#36742D"]
 my_cmap = LinearSegmentedColormap.from_list('my_cmap', colourList)
 
-def report(m, param_spec, data, path=None):
+def save_conditions(param_spec, setup, out_txt=None):
+    """Write a record of what a fit was actually run with: starting values
+    and limits for every free parameter, and the channel / coupling-group
+    setup. Meant to be called alongside report() so a fit's *inputs* are
+    saved next to its *outputs*, and a past fit can be reproduced or
+    audited later without re-reading the config it came from."""
+    lines = ["=" * 66, " FIT CONDITIONS", "=" * 66, ""]
+ 
+    lines.append("-- channels --")
+    for i, name in enumerate(setup.names):
+        if i == setup.production_idx:
+            role = "production"
+        elif i in setup.open_charm_idxs:
+            role = "open-charm"
+        else:
+            role = "closed"
+        lines.append(f"   [{i}] {name:12s} mass={setup.masses[i]:.6f}  L={setup.oam[i]}  "
+                      f"group={setup.groups[i]:8s} ({role})")
+    lines.append("")
+ 
+    groups = []
+    for group in setup.groups:
+        if group not in groups:
+            groups.append(group)
+    lines.append("-- coupling groups (unique) --")
+    lines.append("   " + ", ".join(groups))
+    lines.append("")
+ 
+    lines.append("-- starting values & limits --")
+    for name, start, lims in zip(param_spec.names, param_spec.start, param_spec.limits):
+        lines.append(f"   {name:14s} start={start:+9.4f}   limits=({lims[0]:+7.3f}, {lims[1]:+7.3f})")
+    lines.append("=" * 66)
+ 
+    text = "\n".join(lines)
+    if out_txt is not None:
+        with open(out_txt, 'w') as outfile:
+            outfile.write(text + "\n")
+        print(f"[REPORT INFO] conditions saved to {out_txt}")
+        return None
+    else:
+        print(text)
+
+def report(m, param_spec, data, out_txt=None):
     x = data[0]
     ndf = len(x) - m.nfit
     lines = [
@@ -44,9 +86,10 @@ def report(m, param_spec, data, path=None):
 
     text = "\n".join(lines)
     print(text)
-    if path is not None:
-        with open(path, 'w') as outfile:
+    if out_txt is not None:
+        with open(out_txt, 'w') as outfile:
             outfile.write(text + "\n")
+        print(f"[REPORT INFO] fit result saved to {out_txt}")
 
 
 def make_plot(m, param_spec, setup, data, config, out_pdf=None):
@@ -132,7 +175,7 @@ def make_plot(m, param_spec, setup, data, config, out_pdf=None):
 
     if out_pdf is not None:
         fig.savefig(out_pdf, bbox_inches='tight')
-        print(f"_INFO_ [plot saved] {out_pdf}")
+        print(f"[REPORT INFO] plot saved to {out_pdf}")
         return None
     else:
         return fig
@@ -184,8 +227,41 @@ def couplings_plot(m, param_spec, setup, config, out_pdf=None):
  
     if out_pdf is not None:
         fig.savefig(out_pdf, bbox_inches='tight')
-        print(f"_INFO_ [plot saved] {out_pdf}")
+        print(f"[REPORT INFO] coupling plot saved to {out_pdf}")
         return None
     else:
         return fig
  
+def plot_covariance(m, param_spec, out_pdf=None):
+    """Heatmap of the fit's parameter correlation matrix,
+    as computed by Minuit.hesse(). Rows/columns are parameters in
+    param_spec.names order."""
+
+    if m.covariance is None:
+        raise RuntimeError("Minuit has no covariance matrix -- call m.hesse() first "
+                            "(KMatrixFit.run() already does this before returning)")
+ 
+    names = param_spec.names
+    n = len(names)
+ 
+    matrix = np.array(m.covariance.correlation())
+    vlim = 1.
+
+    fig, ax = plt.subplots(figsize=(0.55*n + 3, 0.55*n + 3))
+    im = ax.imshow(matrix, cmap=my_cmap, vmin=-vlim, vmax=vlim)
+ 
+    ax.set_xticks(range(n))
+    ax.set_xticklabels(names, rotation=90, fontsize=8)
+    ax.set_yticks(range(n))
+    ax.set_yticklabels(names, fontsize=8)
+ 
+    fig.colorbar(im, ax=ax, label="correlation", shrink=0.8)
+    fig.tight_layout()
+ 
+    if out_pdf is not None:
+        fig.savefig(out_pdf, bbox_inches='tight')
+        print
+        (f"[REPORT INFO] correlation plot saved to {out_pdf}")
+        return None
+    else:
+        return fig
