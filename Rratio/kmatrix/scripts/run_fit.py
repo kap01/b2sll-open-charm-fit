@@ -24,7 +24,7 @@ from reporting import *
 
 if __name__ == "__main__":
     user_path = "/users/sd22284/b2sll_open_charm/repo/Rratio/"
-    CONFIG_FILE = user_path + "kmatrix/config/v3_modularised.yml"
+    CONFIG_FILE = user_path + "kmatrix/config/working_config.yml"
 
     config = load_config(CONFIG_FILE)
     validate_config(config)
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     today = datetime.now().strftime("%Y_%m_%d")
     makedirs(today+'/'+outfolder, exist_ok=True)
 
-    data = load_data(rootfile)
+    data = load_data(rootfile, config['fit']['fit_range'])
 
     fit_cfg = config.get("fit", {})
     fitter = KMatrixFit(data, param_spec, setup)
@@ -46,7 +46,9 @@ if __name__ == "__main__":
     best = fitter.run(n_starts=fit_cfg.get("n_starts", 6),   ## execute the multi-start MIGRAD loop
                        seed=fit_cfg.get("seed", 1),
                        jitter=fit_cfg.get("jitter"))
-
-    report(best, param_spec, data, path=f"{today}/{outfolder}/fit_result.txt")
+    ## save output                       
+    save_conditions(param_spec, setup, out_txt=f"{today}/{outfolder}/fit_conditions.txt")
+    report(best, param_spec, data, out_txt=f"{today}/{outfolder}/fit_result.txt")
     make_plot(best, param_spec, setup, data, config["plotting"], out_pdf=f"{today}/{outfolder}/fit_result.pdf")
     couplings_plot(best, param_spec, setup, config['plotting'], out_pdf=f"{today}/{outfolder}/couplings.pdf")
+    plot_covariance(best, param_spec, out_pdf=f"{today}/{outfolder}/correlations.pdf")
