@@ -59,9 +59,16 @@ class ParameterSpec:
         N_ch = len(self.continuum_coupling_idx)
         bare_masses = np.array([par[i] for i in self.res_mass_idx])
         g = np.zeros((n_res, N_ch))
+        # scaler = 1
         for a in range(n_res):
             g[a] = [par[i] for i in self.res_coupling_idx[a]]
+            ## HARDCODING THE RELATIVE COUPLING FOR THE D CHANNELS
+            # g[a][2] = scaler * g[a][1] ## first idx for DpDm channel, second idx for DzDzbar channel
+            # g[a][5] = scaler * g[a][4] ## first idx for DpDm channel, second idx for DzDzbar channel
         b = np.array([par[i] if i >= 0 else 0.0 for i in self.continuum_coupling_idx])
+        ## HARDCODING THE RELATIVE COUPLING FOR THE D CHANNELS
+        # b[2] = scaler * b[1]
+        # b[5] = scaler * b[4]
         baseline = par[self.baseline_idx]
         return bare_masses, g, b, baseline
 
