@@ -150,7 +150,7 @@ class AsymChi2:
         if not np.all(np.isfinite(m)):
             return 1e12
         sigma = np.where(m >= self.y, self.eyh, self.eyl)
-        return float(np.sum(((m - self.y) / sigma) ** 2))
+        return np.sum(((m.real - self.y) / sigma) ** 2) ## use real part only, m.imag should be 0 anyway
 
 
 ## ------------------------------------------------------------------ fit driver

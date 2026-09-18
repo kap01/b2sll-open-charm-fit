@@ -43,14 +43,22 @@ def limit_warning(m, param_spec):
             print(f"              parameter {name} has converged at upper limit {result}")
     return
 
-def save_conditions(param_spec, setup, out_txt=None):
+def save_conditions(param_spec, setup, limits, out_txt=None):
     """Write a record of what a fit was actually run with: starting values
     and limits for every free parameter, and the channel / coupling-group
     setup. Meant to be called alongside report() so a fit's *inputs* are
     saved next to its *outputs*, and a past fit can be reproduced or
     audited later without re-reading the config it came from."""
     lines = ["=" * 66, " FIT CONDITIONS", "=" * 66, ""]
- 
+
+    lines.append("-- overview --")
+    lines.append(f"   Number of channels        : {len(setup.names)}")
+    lines.append(f"   Number of resonances      : {len(param_spec.res_mass_idx)}")
+    lines.append(f"   Number of coupling groups : {len(set(setup.groups))}")
+    lines.append(f"   z0 value (q0 value)       : {setup.z0} ({1/setup.z0:.4f})")
+    lines.append(f"   Fit range                 : {limits['low']} - {limits['high']}")
+    lines.append("")
+
     lines.append("-- channels --")
     for i, name in enumerate(setup.names):
         if i == setup.production_idx:
@@ -124,8 +132,8 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
     hi_idx = np.searchsorted(x_all, plot_hi, side='left')
     ## cut all data to these indexes
     x, y, eyl, eyh, ids = (x_all[lo_idx:hi_idx], y_all[lo_idx:hi_idx],
-                             eyl_all[lo_idx:hi_idx], eyh_all[lo_idx:hi_idx],
-                             ids[lo_idx:hi_idx])
+                                eyl_all[lo_idx:hi_idx], eyh_all[lo_idx:hi_idx],
+                                ids[lo_idx:hi_idx])
     ## for later see how many of the data sources this leaves:
     unique_ids = list(set(ids))
 
@@ -147,10 +155,10 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
     pulls = (Rtot_atData - y) / pull_sigma
     ## colour code the pull point
     pull_colours = ['limegreen' if v <= 1 else 'forestgreen' if 1 < v <= 3
-                     else 'goldenrod' if 3 < v <= 5 else 'crimson' for v in np.abs(pulls)]
+                        else 'goldenrod' if 3 < v <= 5 else 'crimson' for v in np.abs(pulls)]
 
     fig, axis = plt.subplots(2, 1, figsize=(11, 7.5), sharex=True,
-                              gridspec_kw={'height_ratios': [3, 1], 'hspace': 0.06})
+                                gridspec_kw={'height_ratios': [3, 1], 'hspace': 0.06})
     ax = axis[0]
 
     ##  - plot the data
@@ -195,7 +203,7 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
 
     ax.set_ylabel(r"$R = \sigma_{\rm had}/\sigma_{\mu\mu}$")
     ax.set_title(f"Coupled-channel K-matrix fit ({setup.N_ch} channels, "
-                 f"{len(param_spec.res_mass_idx)} resonances)")
+                    f"{len(param_spec.res_mass_idx)} resonances)")
     ax.legend(loc="lower right")
 
     # axis[1].bar(data_edges[:-1], pulls, width=0.8*data_widths, color=pull_colours,
@@ -208,6 +216,9 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
     axis[1].set_ylabel(r"$(R^{fit} - R^{data}) / \sigma^{data}$")
     axis[1].set_xlim(plot_lo, plot_hi)
     axis[1].set_xlabel(r"$\sqrt{s}$  [GeV]", loc='right')
+
+    fval_annotation = r"  $\chi^{2}$     : "+f"{m.fval:.2f}\n"+r"$\chi^{2}$/ndof :    "+f"{m.fval/(len(x_all) - m.nfit):.2f}"
+    axis[0].annotate(fval_annotation, (0.98,0.97), xycoords='axes fraction', va='top', ha='right', fontsize=13)
 
     fig.subplots_adjust(left=0.08, right=0.98, top=0.94, bottom=0.08, hspace=0.06)
 

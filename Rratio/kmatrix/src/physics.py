@@ -199,7 +199,7 @@ def build_K(s, bare_masses, g):
     """bare_masses: (n_res,); g: (n_res, N_ch). Returns K: (N_s, N_ch, N_ch).
     Unchanged: real, symmetric pole expansion, Eq. (9) (background term
     omitted, matching the existing config)."""
-    s = np.atleast_1d(s).astype(float) ## will throw a warning, this is ok
+    s = np.atleast_1d(s).real
     n_res = bare_masses.shape[0]
     N_ch = g.shape[1]
     K = np.zeros((s.shape[0], N_ch, N_ch), dtype=float)
