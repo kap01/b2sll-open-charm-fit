@@ -28,10 +28,11 @@ class ChannelSetup:
     _fields = ("names", "masses", "oam", "groups", "tex",
                "production_idx", "open_charm_idxs", "z0")
 
-    def __init__(self, names, masses, oam, groups, tex,
+    def __init__(self, names, masses, masses2, oam, groups, tex,
                  production_idx, open_charm_idxs, z0):
         self.__dict__["names"] = names                         # channel names, index-aligned; for reporting/plotting only
-        self.__dict__["masses"] = masses                       # (N_ch,) threshold mass of one leg of each channel
+        self.__dict__["masses"] = masses                       # (N_ch,) threshold mass of one leg of each channel - this first particle
+        self.__dict__["masses2"] = masses2                     # (N_ch,) threshold mass of one leg of each channel - the second particle
         self.__dict__["oam"] = oam                             # (N_ch,) orbital angular momentum per channel (0 or 1)
         self.__dict__["groups"] = groups                       # (N_ch,) coupling-group name per channel, index-aligned
         self.__dict__["tex"] = tex                             # (N_ch,) tex for each of the channels to label on the plot
@@ -129,7 +130,8 @@ def build_channel_setup(config):
     channels_cfg = config["channels"]
 
     names = tuple(c["name"] for c in channels_cfg)
-    masses = np.array([c["mass"] for c in channels_cfg], dtype=float)
+    masses  = np.array([c["mass"] for c in channels_cfg], dtype=float)
+    masses2 = masses ## np.array([c["mass2"] for c in channels_cfg], dtype=float)
     oam = np.array([c["oam"] for c in channels_cfg], dtype=int)
     tex = [c.get("tex", c["name"]) for c in channels_cfg]
 
@@ -150,7 +152,7 @@ def build_channel_setup(config):
     else:
         z0 = 3.0
 
-    return ChannelSetup(names=names, masses=masses, oam=oam, groups=groups, tex=tex,
+    return ChannelSetup(names=names, masses=masses, masses2=masses2, oam=oam, groups=groups, tex=tex,
                          production_idx=production_idx,
                          open_charm_idxs=open_charm_idxs, z0=z0)
 

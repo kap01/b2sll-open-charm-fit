@@ -14,7 +14,7 @@ ParameterSpec.unpack() produces.
 import numpy as np
 from iminuit import Minuit
 
-from physics import R_model
+from physics import R_model, precompute_kinematics
 
 
 ## ------------------------------------------------------------------ parameter bookkeeping
@@ -142,10 +142,11 @@ class AsymChi2:
         self.x, self.y, self.eyl, self.eyh = x, y, eyl, eyh
         self.param_spec = param_spec
         self.setup = channel_setup
+        self.kinematics = precompute_kinematics(self.x, channel_setup)
 
     def __call__(self, par):
         bare_masses, g, b, baseline = self.param_spec.unpack(par)
-        m, _, _ = R_model(self.x, bare_masses, g, b, baseline, self.setup)
+        m, _, _ = R_model(bare_masses, g, b, baseline, self.kinematics, self.setup)
         if not np.all(np.isfinite(m)):
             return 1e12
         sigma = np.where(m >= self.y, self.eyh, self.eyl)
@@ -198,9 +199,11 @@ class KMatrixFit:
             m = self._new_minuit(init)
             try:
                 m.migrad(ncall=400000)
-                m.simplex()
-                m.migrad()
-            except Exception:
+                if not m.valid: ## escape local minima
+                    m.simplex()
+                    m.migrad(ncall=400000)
+            except Exception as e:
+                print("[FIT INFO] Exception during migrad:\n", repr(e))
                 continue
             if m.valid and (best is None or m.fval < best.fval):
                 best = m
@@ -221,4 +224,5 @@ class KMatrixFit:
             raise RuntimeError("call setup() (and usually run()) before evaluate()")
         par = [self.minuit.values[name] for name in self.param_spec.names]
         bare_masses, g, b, baseline = self.param_spec.unpack(par)
-        return R_model(sqrt_s, bare_masses, g, b, baseline, self.channel_setup)
+        kinematics = precompute_kinematics(sqrt_s, self.channel_setup)
+        return R_model(bare_masses, g, b, baseline, kinematics, self.channel_setup)
