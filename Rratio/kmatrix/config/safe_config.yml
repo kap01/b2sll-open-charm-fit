@@ -12,7 +12,7 @@ paths:
   data_path: 
      - "data/BES2002/ins552757-v1.root"
      - "data/BESII2006A/table_2.root"
-  save_path: "check_pullcode"
+  save_path: "fixed_oam"
 
 constants:
   z0: 1.4        # Blatt-Weisskopf radius; alternatively give q0 (z0 = 1/q0)
@@ -27,7 +27,7 @@ plotting:
     Dst  : '$D^{*}\overline{D}^{*}$'
     Ds   : '$D_{s}\overline{D}_{s}$'
   source_tex:
-     - "BES2002"
+     - "BES 2002"
      - "BESII 2006A"
 fit:
   fit_range:
@@ -74,7 +74,7 @@ channels:
   - name: DsDs
     mass : 1.96835
     mass2: 1.96835
-    oam: 0
+    oam: 1
     coupling_group: Ds
     open_charm: true
     tex: '$D_{s}\overline{D}_{s}$'
@@ -82,7 +82,7 @@ channels:
   - name: Dst0Dst0
     mass : 2.00685
     mass2: 2.00685
-    oam: 0
+    oam: 1
     coupling_group: Dst
     open_charm: true
     tex: '$D^{*0}\overline{D}^{*0}$'
@@ -90,7 +90,7 @@ channels:
   - name: DstpDstm
     mass : 2.01026
     mass2: 2.01026
-    oam: 0
+    oam: 1
     coupling_group: Dst
     open_charm: true
     tex: '$D^{*+}D^{*-}$'
@@ -102,8 +102,8 @@ channels:
 resonances:
   - label: "1" ## trying to make this the psi(3770)
     mass:
-      start: 3.77
-      limits: [3.70, 3.85]
+      start: 3.773
+      limits: [3.773, 3.773]
     couplings:
       ee:  {start: 0.30, limits: [-8.0, 8.0]}
       DD:  {start: 0.50, limits: [-8.0, 8.0]}
@@ -113,7 +113,7 @@ resonances:
   - label: "2"
     mass:
       start: 4.010 ## could be near the psi(4040)?
-      limits: [4.05, 4.12]
+      limits: [3.8, 4.12]
     couplings:
       ee:  {start: 0.60, limits: [-8.0, 8.0]}
       DD:  {start: 0.30, limits: [-8.0, 8.0]}

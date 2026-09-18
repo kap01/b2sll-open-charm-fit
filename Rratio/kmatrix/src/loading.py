@@ -157,13 +157,28 @@ def build_channel_setup(config):
                          open_charm_idxs=open_charm_idxs, z0=z0)
 
 
-def load_data(path, fit_range):
-    g = uproot.open(path)["R"]
-    x_all = np.asarray(g.values("x"), dtype=float)
-    idx_lo = np.searchsorted(x_all, fit_range['low'], side='right')
-    idx_hi = np.searchsorted(x_all, fit_range['high'], side='left')
-    x = x_all[idx_lo:idx_hi]
-    y = np.asarray(g.values("y"), dtype=float)[idx_lo:idx_hi]
-    eyl = np.asarray(g.errors("low", "y"), dtype=float)[idx_lo:idx_hi]
-    eyh = np.asarray(g.errors("high", "y"), dtype=float)[idx_lo:idx_hi]
-    return x, y, eyl, eyh
+def load_data(paths, fit_range, return_id=False):
+    x, y, eyl, eyh, ids = np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
+    for idx, p in enumerate(paths):
+        g = uproot.open(p)["R"]
+        x_all = np.asarray(g.values("x"), dtype=float)
+        idx_lo = np.searchsorted(x_all, fit_range['low'], side='right')
+        idx_hi = np.searchsorted(x_all, fit_range['high'], side='left')
+
+        this_x  = x_all[idx_lo:idx_hi]
+        this_y  = np.asarray(g.values("y"), dtype=float)[idx_lo:idx_hi]
+        this_eyl = np.asarray(g.errors("low", "y"), dtype=float)[idx_lo:idx_hi]
+        this_eyh = np.asarray(g.errors("high", "y"), dtype=float)[idx_lo:idx_hi]
+
+        this_id = np.full_like(this_x, idx)
+
+        x = np.hstack([x, this_x])
+        y = np.hstack([y, this_y])
+        eyl = np.hstack([eyl, this_eyl])
+        eyh = np.hstack([eyh, this_eyh])
+        ids = np.hstack([ids, this_id])
+
+    if not return_id:
+        return x, y, eyl, eyh
+    else:
+        return x, y, eyl, eyh, ids
