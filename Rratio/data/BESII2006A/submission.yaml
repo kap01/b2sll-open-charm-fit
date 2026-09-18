@@ -1,0 +1,27 @@
+additional_resources:
+- {description: Created with hepdata_lib 0.15.0, location: 'https://doi.org/10.5281/zenodo.1217998'}
+comment: We report measurents of the continuum $R_{\rm uds}$ near the center-of-mass
+  energy of 3.70 GeV, the $R_{{\rm uds(c)}+\psi(3770)}(s)$ and the $R_{\rm had}(s)$
+  values in $e^+e^-$ annihilation at 68 energy points in the energy region between
+  3.650 and 3.872 GeV with the BES-II detector at the BEPC Collodier. We obtain the
+  $R_{\rm uds}$ for the continuum light hadron (containing u, d and s quarks) production
+  near the $D\bar D$ threshold to be $R_{\rm uds}=2.141 \pm 0.025 \pm 0.085$. NUMERICAL
+  VALUES HAVE BEEN DIGITISED FROM THE PAPER.
+data_license: {description: 'CC0 enables reusers to distribute, remix, adapt, and
+    build upon the material in any medium or format, with no conditions.', name: CC0,
+  url: 'https://creativecommons.org/publicdomain/zero/1.0/'}
+hepdata_doi: 10.17182/hepdata.174006.v1
+---
+data_file: table_1.yaml
+description: $R=\sigma(e^+e^-\to uds+ \psi(3770))/\sigma(e^+e^-\to \mu^+\mu^-)$
+keywords: []
+location: ''
+name: Table 1
+table_doi: 10.17182/hepdata.174006.v1/t1
+---
+data_file: table_2.yaml
+description: $R=\sigma(e^+e^-\to \mathrm{hadrons})/\sigma(e^+e^-\to \mu^+\mu^-)$
+keywords: []
+location: ''
+name: Table 2
+table_doi: 10.17182/hepdata.174006.v1/t2

@@ -4,3 +4,4 @@ Rratio/kmatrix/src/__pycache__/*
 *_old.py
 *_dev.py
 *_new.py
+*.root

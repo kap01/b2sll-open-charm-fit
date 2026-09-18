@@ -1,0 +1,14 @@
+dependent_variables:
+- header: {name: SIG, units: NB}
+  qualifiers:
+  - {name: RE(, value: E+ E- --> PSI(3770)}
+  - {name: SQRT(S), units: GeV, value: '3.773'}
+  values:
+  - errors:
+    - {label: stat, symerror: 0.253}
+    - {label: sys, symerror: 0.801}
+    value: 9.323
+independent_variables:
+- header: {name: SQRT(S), units: GEV}
+  values:
+  - {value: 3.773}

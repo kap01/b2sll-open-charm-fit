@@ -1,0 +1,15 @@
+dependent_variables:
+- header: {name: SIG(Q=HAD)/SIG(Q=MU)}
+  qualifiers:
+  - {name: RE(Q=HAD), value: E+ E- --> HADRONS}
+  - {name: RE(Q=MU), value: E+ E- --> MU+ MU-}
+  - {name: SQRT(S), units: GeV, value: '3.65'}
+  values:
+  - errors:
+    - {label: stat, symerror: 0.019}
+    - {label: sys, symerror: 0.089}
+    value: 2.218
+independent_variables:
+- header: {name: SQRT(S), units: GEV}
+  values:
+  - {high: 7.3148, low: -0.0148}

@@ -1,0 +1,49 @@
+dependent_variables:
+- header: {name: SIG(Q=HAD), units: NB}
+  qualifiers:
+  - {name: RE(Q=HAD), value: E+ E- --> HADRONS}
+  - {name: RE(Q=MU), value: E+ E- --> MU+ MU-}
+  - {name: SQRT(S), units: GeV, value: 3.65-3.773}
+  values:
+  - errors:
+    - {label: stat, symerror: 0.067}
+    - {label: sys, symerror: 0.141}
+    - {label: sys, symerror: 0.588}
+    value: 14.578
+  - errors:
+    - {label: stat, symerror: 0.158}
+    - {label: sys, symerror: 0.139}
+    - {label: sys, symerror: 0.58}
+    value: 14.128
+  - errors:
+    - {label: stat, symerror: 0.046}
+    - {label: sys, symerror: 0.22}
+    - {label: sys, symerror: 1.144}
+    value: 22.855
+- header: {name: SIG(Q=HAD)/SIG(Q=MU)}
+  qualifiers:
+  - {name: RE(Q=HAD), value: E+ E- --> HADRONS}
+  - {name: RE(Q=MU), value: E+ E- --> MU+ MU-}
+  - {name: SQRT(S), units: GeV, value: 3.65-3.773}
+  values:
+  - errors:
+    - {label: stat, symerror: 0.01}
+    - {label: sys, symerror: 0.022}
+    - {label: sys, symerror: 0.089}
+    value: 2.236
+  - errors:
+    - {label: stat, symerror: 0.024}
+    - {label: sys, symerror: 0.022}
+    - {label: sys, symerror: 0.087}
+    value: 2.185
+  - errors:
+    - {label: stat, symerror: 0.008}
+    - {label: sys, symerror: 0.036}
+    - {label: sys, symerror: 0.187}
+    value: 3.746
+independent_variables:
+- header: {name: SQRT(S), units: GEV}
+  values:
+  - {value: 3.65}
+  - {value: 3.6648}
+  - {value: 3.773}
