@@ -27,6 +27,22 @@ plt.rcParams.update({'font.family': 'serif',
 colourList = ["mediumvioletred", "#FF3EB7", "orchid", "whitesmoke", "#8AD291", "limegreen", "#36742D"]
 my_cmap = LinearSegmentedColormap.from_list('my_cmap', colourList)
 
+
+def limit_warning(m, param_spec):
+    """Warn if any of the fit parameters have hit their limits when
+    the fit is reported as minimised. Use result being less than 0.1% 
+    of itself to the limit value as equality"""
+    for name, lims in zip(param_spec.names, param_spec.limits):
+        result = m.values[name]
+        # print(f"[TEMP READOUT CHECK] {name} {result} {lims[0]} {lims[1]}")
+        if abs(result-lims[0]) < 0.0001*result:
+            print(f"[REPORT INFO] ***WARNING***")
+            print(f"              parameter {name} has converged at lower limit {result}")
+        elif abs(result-lims[1]) < 0.0001*result:
+            print(f"[REPORT INFO] ***WARNING***")
+            print(f"              parameter {name} has converged at upper limit {result}")
+    return
+
 def save_conditions(param_spec, setup, out_txt=None):
     """Write a record of what a fit was actually run with: starting values
     and limits for every free parameter, and the channel / coupling-group
@@ -190,17 +206,24 @@ def couplings_plot(m, param_spec, setup, config, out_pdf=None):
     [groups.append(c) for c in setup.groups if c not in groups] ## using list comprehsnion to preserve the order of the channels from config
     tex = [config['group_tex'][g] for g in groups]
     resonances = [param_spec.names[i] for i in param_spec.res_mass_idx]
-    res_m = [np.round(m.values[r], 3) for r in resonances]
-
+    resonances_masses = [np.round(m.values[r], 3) for r in resonances]
+    resonances_tex = [f"${r}$ = {m}" for r,m in zip(resonances, resonances_masses)]
+    ## artifically add the background coupling
+    resonances += ["b"]
+    resonances_tex += ["(background)"]
     
     z = np.full((len(resonances), len(groups)), np.nan)
-    for r, l in enumerate(resonances):
-        label = l[2:] ## because they are of the form M_X
-        for c, group in enumerate(groups):
-            name = f"g_{label}_{group}"
+    for c, group in enumerate(groups):
+        for r, l in enumerate(resonances):
+            ## background has different coupling name syntax:
+            if r != len(resonances)-1:
+                label = l[2:] ## because they are of the form M_X
+                name = f"g_{label}_{group}"
+            else:
+                name = f"b_{group}"
             if name in param_spec.names:
                 z[r, c] = m.values[name]
- 
+
     fig, ax = plt.subplots(figsize=(1.2*len(groups) + 2, 0.9*len(resonances) + 2))
     vmax = np.nanmax(np.abs(z))
     im = ax.imshow(z, cmap=my_cmap, vmin=-vmax, vmax=vmax, aspect="auto")
@@ -209,7 +232,7 @@ def couplings_plot(m, param_spec, setup, config, out_pdf=None):
     ax.set_yticks(range(len(resonances)))
     # ax.set_yticklabels([f"resonance {label}" for label in labels])
     ax.set_xticklabels(tex)
-    ax.set_yticklabels([f"${r}$ = {m}" for r,m in zip(resonances, res_m)])
+    ax.set_yticklabels(resonances_tex)
     ax.set_xlabel("coupling group")
     ax.set_ylabel("resonance / GeV")
     ax.set_title(r"Fitted coupling constants $g^{r}_{c}$")

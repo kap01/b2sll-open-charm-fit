@@ -49,6 +49,7 @@ if __name__ == "__main__":
     ## save output                       
     save_conditions(param_spec, setup, out_txt=f"{today}/{outfolder}/fit_conditions.txt")
     report(best, param_spec, data, out_txt=f"{today}/{outfolder}/fit_result.txt")
+    limit_warning(best, param_spec) ## after the above function as report is a big chunk of text in the terminal
     make_plot(best, param_spec, setup, data, config["plotting"], out_pdf=f"{today}/{outfolder}/fit_result.pdf")
     couplings_plot(best, param_spec, setup, config['plotting'], out_pdf=f"{today}/{outfolder}/couplings.pdf")
     plot_covariance(best, param_spec, out_pdf=f"{today}/{outfolder}/correlations.pdf")
