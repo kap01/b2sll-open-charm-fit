@@ -98,27 +98,22 @@ def make_plot(m, param_spec, setup, data, config, out_pdf=None):
     lo_idx = np.searchsorted(x_all, plot_lo, side='left')
     hi_idx = np.searchsorted(x_all, plot_hi, side='left')
     x, y, eyl, eyh = (x_all[lo_idx:hi_idx], y_all[lo_idx:hi_idx],
-                       eyl_all[lo_idx:hi_idx], eyh_all[lo_idx:hi_idx])
+                        eyl_all[lo_idx:hi_idx], eyh_all[lo_idx:hi_idx])
 
     par = np.array([m.values[name] for name in param_spec.names])
     bare_masses, g, b, baseline = param_spec.unpack(par)
 
-    grid = np.linspace(plot_lo - 0.05, plot_hi + 0.05, 1600)
+    ## - calculate model value smoothly across plot range
+    grid = np.linspace(plot_lo - 0.05, plot_hi + 0.05, 10000)
     Rtot, Rbase, Rbg = R_model(grid, bare_masses, g, b, baseline, setup)
 
-    ## ---- pull distribution: model integrated over each data bin's width,
-    ## errors use the same asymmetric convention as the fit's cost function
-    data_diffs = np.diff(x)
-    data_edges = np.concatenate(([x[0] - 0.5*data_diffs[0]], 0.5*(x[:-1] + x[1:]),
-                                  [x[-1] + 0.5*data_diffs[-1]]))
-    data_widths = np.diff(data_edges)
-    Rtot_integrals = np.array([
-        mytrapz(Rtot[(grid >= lo) & (grid < hi)], grid[(grid >= lo) & (grid < hi)])
-        for lo, hi in zip(data_edges[:-1], data_edges[1:])
-    ])
-    Rtot_averages = Rtot_integrals / data_widths
-    pull_sigma = np.where(Rtot_averages >= y, eyh, eyl)
-    pulls = (Rtot_averages - y) / pull_sigma
+    ##  - calculate pull distribution
+    ## calculate model value at each datapoint for pulls
+    Rtot_atData, _, _ = R_model(x, bare_masses, g, b, baseline, setup)
+    ## choose the right sigma
+    pull_sigma = np.where(Rtot_atData >= y, eyh, eyl)
+    pulls = (Rtot_atData - y) / pull_sigma
+    ## colour code the pull point
     pull_colours = ['limegreen' if v <= 1 else 'forestgreen' if 1 < v <= 3
                      else 'goldenrod' if 3 < v <= 5 else 'crimson' for v in np.abs(pulls)]
 
@@ -161,11 +156,12 @@ def make_plot(m, param_spec, setup, data, config, out_pdf=None):
                  f"{len(param_spec.res_mass_idx)} resonances)")
     ax.legend(loc="lower right")
 
-    axis[1].bar(data_edges[:-1], pulls, width=0.8*data_widths, color=pull_colours,
-                align='edge', edgecolor="none", zorder=5)
-    axis[1].axhline(0., color='black', linewidth=1., zorder=-10)
-    axis[1].axhline(3., color='slategray', linewidth=1., zorder=-10, linestyle='--', alpha=0.5)
-    axis[1].axhline(-3., color='slategray', linewidth=1., zorder=-10, linestyle='--', alpha=0.5)
+    # axis[1].bar(data_edges[:-1], pulls, width=0.8*data_widths, color=pull_colours,
+                # align='edge', edgecolor="none", zorder=5)
+    axis[1].scatter(x, pulls, color=pull_colours, marker='+', s=50, zorder=5)
+    axis[1].axhline(0., color='slategray', linewidth=0.75, linestyle='--', zorder=-10)
+    axis[1].axhline(2., color='slategray', linewidth=0.75, zorder=-10, linestyle='--', alpha=0.5)
+    axis[1].axhline(-2., color='slategray', linewidth=0.75, zorder=-10, linestyle='--', alpha=0.5)
     axis[1].set_ylim(-5, 5)
     axis[1].set_ylabel(r"$(R^{fit} - R^{data}) / \sigma^{data}$")
     axis[1].set_xlim(plot_lo, plot_hi)
