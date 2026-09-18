@@ -108,14 +108,28 @@ def report(m, param_spec, data, out_txt=None):
         print(f"[REPORT INFO] fit result saved to {out_txt}")
 
 
-def make_plot(m, param_spec, setup, data, config, out_pdf=None):
+def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
     plot_lo, plot_hi = config["limits"]["low"], config["limits"]["high"]
+
+    ## - prepare data
+    ## load the data:
     x_all, y_all, eyl_all, eyh_all = data
+    ## sort in terms of sqrt s value
+    sorted_idx = np.argsort(x_all)
+    ## shuffle all the data to be in sorted order
+    x_all, y_all, eyl_all, eyh_all, ids = (x_all[sorted_idx], y_all[sorted_idx], eyl_all[sorted_idx], 
+                                            eyh_all[sorted_idx], ids[sorted_idx])
+    ## find the idx of lowest and highest elements to include
     lo_idx = np.searchsorted(x_all, plot_lo, side='left')
     hi_idx = np.searchsorted(x_all, plot_hi, side='left')
-    x, y, eyl, eyh = (x_all[lo_idx:hi_idx], y_all[lo_idx:hi_idx],
-                        eyl_all[lo_idx:hi_idx], eyh_all[lo_idx:hi_idx])
+    ## cut all data to these indexes
+    x, y, eyl, eyh, ids = (x_all[lo_idx:hi_idx], y_all[lo_idx:hi_idx],
+                             eyl_all[lo_idx:hi_idx], eyh_all[lo_idx:hi_idx],
+                             ids[lo_idx:hi_idx])
+    ## for later see how many of the data sources this leaves:
+    unique_ids = list(set(ids))
 
+    ##  - prepare the parameters
     par = np.array([m.values[name] for name in param_spec.names])
     bare_masses, g, b, baseline = param_spec.unpack(par)
 
@@ -138,8 +152,18 @@ def make_plot(m, param_spec, setup, data, config, out_pdf=None):
     fig, axis = plt.subplots(2, 1, figsize=(11, 7.5), sharex=True,
                               gridspec_kw={'height_ratios': [3, 1], 'hspace': 0.06})
     ax = axis[0]
-    ax.errorbar(x, y, yerr=[eyl, eyh], fmt="o", ms=4, color="black",
-                elinewidth=0.8, capsize=1.5, zorder=5, label="data")
+
+    ##  - plot the data
+    markers = ['o', 'v', 's', 'P', '*'] ## expect less than 5 sources for now
+    datacolours = ['black', 'rebeccapurple', 'mediumblue'] ## expect less than 5 sources for now
+    for this_id in unique_ids: ## assume the ids are [0, 1, 2,....] as set up to be like this
+        this_idx = np.where(ids==this_id)
+        this_sourcetex = config["source_tex"][int(this_id)]
+        this_x, this_y, this_eyl, this_eyh = x[this_idx], y[this_idx], eyl[this_idx], eyh[this_idx]
+        ax.errorbar(this_x, this_y, yerr=[this_eyl, this_eyh], fmt=markers[int(this_id)], ms=4, color=datacolours[int(this_id)],
+                    elinewidth=0.8, capsize=1.5, zorder=5, label="data ({source})".format(source=this_sourcetex))
+
+    ##  - plot the model
     ax.plot(grid, Rbg, "--", color="lightseagreen", lw=1.3,
             label=r"non-resonant continuum ($|b|^2$)")
     ax.plot(grid, Rbase, ":", color="violet", lw=1.2, label="light-quark baseline")

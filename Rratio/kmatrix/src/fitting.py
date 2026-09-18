@@ -15,7 +15,7 @@ import numpy as np
 from iminuit import Minuit
 
 from physics import R_model, precompute_kinematics
-
+from reporting import limit_warning
 
 ## ------------------------------------------------------------------ parameter bookkeeping
 class ParameterSpec:

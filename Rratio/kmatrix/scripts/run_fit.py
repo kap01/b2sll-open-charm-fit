@@ -32,13 +32,14 @@ if __name__ == "__main__":
     setup = build_channel_setup(config)
     param_spec = build_parameter_spec(config, setup)
 
-    rootfile = user_path + config["paths"]["data_path"]
+    rootfiles = [user_path+p for p in config["paths"]["data_path"]]
     outfolder = config["paths"]["save_path"]
 
     today = datetime.now().strftime("%Y_%m_%d")
     makedirs(today+'/'+outfolder, exist_ok=True)
 
-    data = load_data(rootfile, config['fit']['fit_range'])
+    x, y, eyl, eyh, source_ids = load_data(rootfiles, config['fit']['fit_range'], return_id=True)
+    data = x, y, eyl, eyh
 
     fit_cfg = config.get("fit", {})
     fitter = KMatrixFit(data, param_spec, setup)
@@ -50,6 +51,6 @@ if __name__ == "__main__":
     save_conditions(param_spec, setup, out_txt=f"{today}/{outfolder}/fit_conditions.txt")
     report(best, param_spec, data, out_txt=f"{today}/{outfolder}/fit_result.txt")
     limit_warning(best, param_spec) ## after the above function as report is a big chunk of text in the terminal
-    make_plot(best, param_spec, setup, data, config["plotting"], out_pdf=f"{today}/{outfolder}/fit_result.pdf")
+    make_plot(best, param_spec, setup, data, config["plotting"], source_ids, out_pdf=f"{today}/{outfolder}/fit_result.pdf")
     couplings_plot(best, param_spec, setup, config['plotting'], out_pdf=f"{today}/{outfolder}/couplings.pdf")
     plot_covariance(best, param_spec, out_pdf=f"{today}/{outfolder}/correlations.pdf")

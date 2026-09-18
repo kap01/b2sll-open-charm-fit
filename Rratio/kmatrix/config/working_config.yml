@@ -9,24 +9,31 @@
 
 paths:
   user_path: "/users/sd22284/b2sll_open_charm/repo/Rratio/"
-  data_path: "data/ins552757-v1.root"
-  save_path: "15_twoDsts"
+  data_path: 
+     - "data/BES2002/ins552757-v1.root"
+     - "data/BESII2006A/table_2.root"
+    #  - "data/BESII2006B/Table2.root"
+  save_path: "devDataloading_take3"
 
 constants:
   z0: 3.0        # Blatt-Weisskopf radius; alternatively give q0 (z0 = 1/q0)
 
 plotting:
-  limits:
+  limits: ## note separately set for plot and fit
     low: 3.55
     high: 4.85
   group_tex:
     ee   : '$e^{+}e^{-}$'
-    DD   : '$D\overline{D}$'
+    DD : '$D\overline{D}$'
     Dst  : '$D^{*}\overline{D}^{*}$'
     Ds   : '$D_{s}\overline{D}_{s}$'
+  source_tex:
+     - "BES2002"
+     - "BESII 2006A"
+    #  - "BESII 2006B"
 
 fit:
-  fit_range:
+  fit_range: ## note separately set for plot and fit
     low : 3.55
     high: 4.85
   n_starts: 6
@@ -44,42 +51,48 @@ fit:
 #                      matching the isospin symmetry in the original model)
 channels:
   - name: ee
-    mass: 0.000511
+    mass : 0.000511
+    mass2: 0.000511
     oam: 0
     role: production
     tex : '$e^{+}e^{-}$'
     coupling_group: ee
 
   - name: D0D0bar
-    mass: 1.86484
+    mass : 1.86484
+    mass2: 1.86484
     oam: 1
     coupling_group: DD
     open_charm: true
     tex : '$D^{0}\overline{D}^{0}$'
 
   - name: DpDm
-    mass: 1.86966
+    mass : 1.86966
+    mass2: 1.86966
     oam: 1
     coupling_group: DD
     open_charm: true
     tex: '$D^{+}D^{-}$'
 
   - name: DsDs
-    mass: 1.96835
+    mass : 1.96835
+    mass2: 1.96835
     oam: 0
     coupling_group: Ds
     open_charm: true
     tex: '$D_{s}\overline{D}_{s}$'
 
   - name: Dst0Dst0
-    mass: 2.00685
+    mass : 2.00685
+    mass2: 2.00685
     oam: 0
     coupling_group: Dst
     open_charm: true
     tex: '$D^{*0}\overline{D}^{*0}$'
 
   - name: DstpDstm
-    mass: 2.01026
+    mass : 2.01026
+    mass2: 2.01026
     oam: 0
     coupling_group: Dst
     open_charm: true
@@ -93,27 +106,27 @@ resonances:
   - label: "0" ## trying to make this the psi(3770)
     mass:
       start: 3.77
-      limits: [3.70, 3.85]
+      limits: [3.7, 3.85]
     couplings:
       ee:  {start: 0.30, limits: [-8.0, 8.0]}
       DD:  {start: 0.50, limits: [-8.0, 8.0]}
       Ds:  {start: 0.10, limits: [-8.0, 8.0]}
       Dst: {start: 0.10, limits: [-8.0, 8.0]}
 
-  - label: "1" ## maybe wants to be the chi(3872)?
-    mass:
-      start: 4.0
-      limits: [3.85, 4.05]
-    couplings:
-      ee:  {start: 0.30, limits: [-8.0, 8.0]}
-      DD:  {start: 0.50, limits: [-8.0, 8.0]}
-      Ds:  {start: 0.10, limits: [-8.0, 8.0]}
-      Dst: {start: 0.10, limits: [-8.0, 8.0]}
+  # - label: "1" ## maybe wants to be the chi(3872)?
+  #   mass:
+  #     start: 4.0
+  #     limits: [3.85, 4.05]
+  #   couplings:
+  #     ee:  {start: 0.30, limits: [-8.0, 8.0]}
+  #     DD:  {start: 0.50, limits: [-8.0, 8.0]}
+  #     Ds:  {start: 0.10, limits: [-8.0, 8.0]}
+  #     Dst: {start: 0.10, limits: [-8.0, 8.0]}
 
   - label: "2"
     mass:
       start: 4.010 ## could be near the psi(4040)?
-      limits: [4.05, 4.12]
+      limits: [3.85, 4.12]
     couplings:
       ee:  {start: 0.60, limits: [-8.0, 8.0]}
       DD:  {start: 0.30, limits: [-8.0, 8.0]}
