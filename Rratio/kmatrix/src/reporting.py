@@ -33,6 +33,9 @@ def limit_warning(m, param_spec):
     the fit is reported as minimised. Use result being less than 0.1% 
     of itself to the limit value as equality"""
     for name, lims in zip(param_spec.names, param_spec.limits):
+        ## catch cases of fixed parameters don't need this check
+        if m.fixed[name]:
+            continue
         result = m.values[name]
         # print(f"[TEMP READOUT CHECK] {name} {result} {lims[0]} {lims[1]}")
         if abs(result-lims[0]) < 0.0001*result:
@@ -81,7 +84,10 @@ def save_conditions(param_spec, setup, limits, out_txt=None):
  
     lines.append("-- starting values & limits --")
     for name, start, lims in zip(param_spec.names, param_spec.start, param_spec.limits):
-        lines.append(f"   {name:14s} start={start:+9.4f}   limits=({lims[0]:+7.3f}, {lims[1]:+7.3f})")
+        if type(lims) == str:
+            lines.append(f"   {name:14s} start={start:+9.4f}   ------{lims}------")
+        else:
+            lines.append(f"   {name:14s} start={start:+9.4f}   limits=({lims[0]:+7.3f}, {lims[1]:+7.3f})")
     lines.append("=" * 66)
  
     text = "\n".join(lines)

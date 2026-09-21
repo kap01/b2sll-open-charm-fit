@@ -91,7 +91,7 @@ def build_parameter_spec(config, setup):
         idx = len(names)
         names.append(name)
         start.append(start_val)
-        limits.append(tuple(lims))
+        limits.append(lims)
         return idx
 
     cont_cfg = config["continuum"]
@@ -164,39 +164,55 @@ class KMatrixFit:
         self.cost = AsymChi2(self.x, self.y, self.eyl, self.eyh, param_spec, channel_setup)
         self.minuit = None
 
-    def _new_minuit(self, start):
+    def new_minuit(self, start=None):
+        start = self.param_spec.start if start is None else start
         m = Minuit(self.cost, start, name=self.param_spec.names)
         for name, lims in zip(self.param_spec.names, self.param_spec.limits):
-            m.limits[name] = lims
+            if type(lims) == str:
+                if lims == "FIXED":
+                    m.fixed[name] = True
+                else:
+                    print("[FITTER INFO] ***WARNING***")
+                    print(f"             unexpected limit value for parameter {name} : {lims}, check config file")
+                    print(f"             fixing parameter in fit by default")
+                    m.fixed[name] = True
+            else:
+                m.limits[name] = lims
         m.strategy = 2
+        if self.minuit == None:
+            self.minuit = m
         return m
 
-    def setup(self):
-        """Build the Minuit object at the configured starting values and
-        apply limits. Does not run the minimisation -- lets you inspect
-        e.g. the starting chi2 (self.minuit.fval) before committing to a fit."""
-        self.minuit = self._new_minuit(self.param_spec.start)
-        return self.minuit
+    # def setup(self):
+    #     """Build the Minuit object at the configured starting values and
+    #     apply limits. Does not run the minimisation -- lets you inspect
+    #     e.g. the starting chi2 (self.minuit.fval) before committing to a fit."""
+    #     self.minuit = self.new_minuit(self.param_spec.start)
+    #     return self.minuit
 
     def run(self, n_starts=6, seed=1, jitter=None):
         """Run MIGRAD with n_starts randomised restarts and keep the best
         valid result. setup() must be called first."""
-        if self.minuit is None:
-            raise RuntimeError("call setup() before run()")
+        # if self.minuit is None:
+        #     raise RuntimeError("call setup() before run()")
 
         jitter = jitter or {"mass": 0.02, "coupling": 0.4, "baseline": 0.0}
         rng = np.random.default_rng(seed)
         base_start = np.array(self.param_spec.start, dtype=float)
 
-        best = None
+        best = None ## this variable will store/return the best fit result of the following loop
         for k in range(n_starts):
             init = base_start.copy()
-            if k > 0:
+            if k > 0: 
+            ## not cross validated but the logic is such that if k>0 self.minuit has
+            ## already been assigned to the initial minuit, so we can use self.minuit's
+            ## settings to find the fixed fit parameters
                 for i in range(len(init)):
-                    sigma = jitter.get(self.param_spec.kind_of(i), 0.0)
-                    if sigma:
-                        init[i] += rng.normal(0, sigma)
-            m = self._new_minuit(init)
+                    if not self.minuit.fixed[self.param_spec.names[i]]:
+                        sigma = jitter.get(self.param_spec.kind_of(i), 0.0)
+                        if sigma:
+                            init[i] += rng.normal(0, sigma)
+            m = self.new_minuit(init)
             try:
                 m.migrad(ncall=400000)
                 if not m.valid: ## escape local minima
@@ -211,7 +227,7 @@ class KMatrixFit:
         if best is None:
             raise RuntimeError("no valid fit found in any restart")
         best.hesse()
-        self.minuit = best
+        self.minuit = best ## overwrite the initial minuit with the best one
         return best
 
     def evaluate(self, sqrt_s):
@@ -221,7 +237,7 @@ class KMatrixFit:
         R_model bound to "the current state of this fit"; scalar or array
         sqrt_s both work (see R_model)."""
         if self.minuit is None:
-            raise RuntimeError("call setup() (and usually run()) before evaluate()")
+            raise RuntimeError("call new_minuit() (and usually run()) before evaluate()")
         par = [self.minuit.values[name] for name in self.param_spec.names]
         bare_masses, g, b, baseline = self.param_spec.unpack(par)
         kinematics = precompute_kinematics(sqrt_s, self.channel_setup)

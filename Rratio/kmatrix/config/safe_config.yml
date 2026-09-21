@@ -12,7 +12,7 @@ paths:
   data_path: 
      - "data/BES2002/ins552757-v1.root"
      - "data/BESII2006A/table_2.root"
-  save_path: "fixed_oam"
+  save_path: "test_fixing_parameters"
 
 constants:
   z0: 1.4        # Blatt-Weisskopf radius; alternatively give q0 (z0 = 1/q0)
@@ -103,7 +103,7 @@ resonances:
   - label: "1" ## trying to make this the psi(3770)
     mass:
       start: 3.773
-      limits: [3.773, 3.773]
+      limits: FIXED
     couplings:
       ee:  {start: 0.30, limits: [-8.0, 8.0]}
       DD:  {start: 0.50, limits: [-8.0, 8.0]}
