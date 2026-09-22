@@ -38,10 +38,10 @@ def limit_warning(m, param_spec):
             continue
         result = m.values[name]
         # print(f"[TEMP READOUT CHECK] {name} {result} {lims[0]} {lims[1]}")
-        if abs(result-lims[0]) < 0.0001*result:
+        if abs(result-lims[0]) < abs(0.0001*result):
             print(f"[REPORT INFO] ***WARNING***")
             print(f"              parameter {name} has converged at lower limit {result}")
-        elif abs(result-lims[1]) < 0.0001*result:
+        elif abs(result-lims[1]) < abs(0.0001*result):
             print(f"[REPORT INFO] ***WARNING***")
             print(f"              parameter {name} has converged at upper limit {result}")
     return
@@ -169,42 +169,56 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
 
     ##  - plot the data
     markers = ['o', 'v', 's', 'P', '*'] ## expect less than 5 sources for now
-    datacolours = ['black', 'rebeccapurple', 'mediumblue'] ## expect less than 5 sources for now
+    datacolours = ['black', 'indigo', 'mediumblue'] ## expect less than 5 sources for now
     for this_id in unique_ids: ## assume the ids are [0, 1, 2,....] as set up to be like this
         this_idx = np.where(ids==this_id)
         this_sourcetex = config["source_tex"][int(this_id)]
         this_x, this_y, this_eyl, this_eyh = x[this_idx], y[this_idx], eyl[this_idx], eyh[this_idx]
         ax.errorbar(this_x, this_y, yerr=[this_eyl, this_eyh], fmt=markers[int(this_id)], ms=4, color=datacolours[int(this_id)],
-                    elinewidth=0.8, capsize=1.5, zorder=5, label="data ({source})".format(source=this_sourcetex))
+                    elinewidth=0.8, capsize=1.5, zorder=50, label="data ({source})".format(source=this_sourcetex))
 
     ##  - plot the model
     ax.plot(grid, Rbg, "--", color="lightseagreen", lw=1.3,
             label=r"non-resonant continuum ($|b|^2$)")
     ax.plot(grid, Rbase, ":", color="violet", lw=1.2, label="light-quark baseline")
-    ax.plot(grid, Rtot, "-", color="mediumvioletred", lw=2.1,
-            label=r"K-matrix fit ($\chi^2/\mathrm{ndf}=%.2f$)" % (m.fval/(len(x)-m.nfit)))
+    ax.plot(grid, Rtot, "-", color="mediumvioletred", lw=2.1, zorder=60,
+            label=r"K-matrix fit")
+            # label=r"K-matrix fit ($\chi^2/\mathrm{ndf}=%.2f$)" % (m.fval/(len(x)-m.nfit)))
 
     ax.set_xlim(plot_lo, plot_hi)
     # ymin, ymax = ax.get_ylim()
     # ax.set_ylim(ymin, ymin + (ymax - ymin) * 1.12)   ## headroom for the labels below
     ax.set_ylim(1.85, 5.2) ## to match prev code
 
+    zorder=0
+    first_loop=True
+    for i in setup.open_charm_idxs: ## don't know where the ee (i.e. non-o-c) channels are
+        m_threshold = setup.masses[i] + setup.masses2[i]
+        ax.axvline(m_threshold, color="deepskyblue", ls="-.", lw=0.9, zorder=zorder)
+        y_pos = ax.get_ylim()[1] * 0.953
+        if not first_loop:
+            if m_threshold-m_threshold_prev < 0.01:
+                y_pos -= 0.27
+        ax.text(
+            m_threshold, y_pos, setup.tex[i], rotation='vertical',
+            ha="center", va="center", fontsize=9, color="deepskyblue",
+            bbox=dict(facecolor="white", edgecolor="none", pad=0.5), zorder=zorder
+        )
+        m_threshold_prev = m_threshold
+        first_loop=False
+        zorder+=1
+
     mass_names = {param_spec.names[i] for i in param_spec.res_mass_idx}
     for name, val in zip(param_spec.names, par):
         if name in mass_names:
-            ax.axvline(val, color="darkorange", ls=":", lw=0.8)
-            ax.text(val, ax.get_ylim()[1] * 0.995, "$"+name+"$", ha="right", va='top', fontsize=11, color="darkorange")
-
-    first_mthr = True
-    for i in setup.open_charm_idxs:
-        m_threshold = 2 * setup.masses[i]
-        ax.axvline(m_threshold, color="deepskyblue", ls="-.", lw=0.8)
-        if not(first_mthr) and m_threshold-2*setup.masses[i-1] < 0.05:
-            ax.text(m_threshold, ax.get_ylim()[1] * 0.955, setup.tex[i], ha="left", va='top', fontsize=11, color="deepskyblue")
-        else:
-            ax.text(m_threshold, ax.get_ylim()[1] * 0.955, setup.tex[i], ha="right", va='top', fontsize=11, color="deepskyblue")
-        first_mthr = False
-
+            ax.axvline(val, color="darkorange", ls=":", lw=0.8, zorder=zorder)
+            # ax.text(val, ax.get_ylim()[1] * 0.995, "$"+name+"$", ha="right", va='top', fontsize=11, color="darkorange")
+            ax.text(
+                val, ax.get_ylim()[1] * 0.99,"$"+name+"$", 
+                ha="center", va="top", fontsize=11, color="darkorange",
+                bbox=dict(facecolor="white", edgecolor="none", pad=1), zorder=zorder
+            )
+        zorder+=1
         
 
     ax.set_ylabel(r"$R = \sigma_{\rm had}/\sigma_{\mu\mu}$")

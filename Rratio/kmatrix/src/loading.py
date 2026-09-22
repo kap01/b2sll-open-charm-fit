@@ -131,7 +131,7 @@ def build_channel_setup(config):
 
     names = tuple(c["name"] for c in channels_cfg)
     masses  = np.array([c["mass"] for c in channels_cfg], dtype=float)
-    masses2 = masses ## np.array([c["mass2"] for c in channels_cfg], dtype=float)
+    masses2 = np.array([c["mass2"] for c in channels_cfg], dtype=float)
     oam = np.array([c["oam"] for c in channels_cfg], dtype=int)
     tex = [c.get("tex", c["name"]) for c in channels_cfg]
 

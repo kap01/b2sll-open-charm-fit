@@ -249,8 +249,12 @@ def R_model(bare_masses, g, b, baseline, kinematics, setup):
     R_bg = np.zeros_like(kinematics.sqrt_s)
     p0 = setup.production_idx
     for j in setup.open_charm_idxs:
-        R_res += kinematics.rho[:, j] * np.abs(M[:, p0, j] + b[j]) ** 2
+        R_res += (2*setup.oam[j]+1) * kinematics.rho[:, j] * np.abs(M[:, p0, j] + b[j]) ** 2
         R_bg += kinematics.rho[:, j] * np.abs(b[j]) ** 2
 
+    scaling = 3* 137**2 / (16*np.pi)
+    R_res *= scaling
+    R_bg *= scaling
+    
     R_baseline = np.full_like(kinematics.sqrt_s, baseline)
     return baseline + R_res, R_baseline, baseline + R_bg
