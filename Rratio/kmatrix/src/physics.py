@@ -236,7 +236,33 @@ def M_matrix(bare_masses, g, setup, kinematics):
 
 
 ## ------------------------------------------------------------------ R model
+## version with the model only for fitting
 def R_model(bare_masses, g, b, baseline, kinematics, setup):
+    """Generic R-ratio model, any number of channels / resonances.
+    Interface unchanged from before -- only the internals of M_matrix /
+    self_energy_function / vertex_vector changed."""
+    # sqrt_s = np.atleast_1d(sqrt_s).astype(float)
+    # s = sqrt_s ** 2
+    M = M_matrix(bare_masses, g, setup, kinematics)
+    # ro = phsp_function(s, setup)
+
+    R_res = np.zeros_like(kinematics.sqrt_s)
+    # R_bg = np.zeros_like(kinematics.sqrt_s)
+    p0 = setup.production_idx
+    for j in setup.open_charm_idxs:
+        R_res += (2*setup.oam[j]+1) * kinematics.rho[:, j] * np.abs(M[:, p0, j] + b[j]) ** 2
+        # R_bg += (2*setup.oam[j]+1) * kinematics.rho[:, j] * np.abs(b[j]) ** 2
+
+    scaling = 3* 137**2 / (16*np.pi)
+    R_res = R_res*scaling + baseline
+    # R_bg *= scaling
+    
+    # R_baseline = np.full_like(kinematics.sqrt_s, baseline)
+    # return baseline + R_res, R_baseline, baseline + R_bg
+    return R_res
+
+## version including the separated parts:
+def R_model_separated(bare_masses, g, b, baseline, kinematics, setup):
     """Generic R-ratio model, any number of channels / resonances.
     Interface unchanged from before -- only the internals of M_matrix /
     self_energy_function / vertex_vector changed."""
@@ -250,7 +276,7 @@ def R_model(bare_masses, g, b, baseline, kinematics, setup):
     p0 = setup.production_idx
     for j in setup.open_charm_idxs:
         R_res += (2*setup.oam[j]+1) * kinematics.rho[:, j] * np.abs(M[:, p0, j] + b[j]) ** 2
-        R_bg += kinematics.rho[:, j] * np.abs(b[j]) ** 2
+        R_bg += (2*setup.oam[j]+1) * kinematics.rho[:, j] * np.abs(b[j]) ** 2
 
     scaling = 3* 137**2 / (16*np.pi)
     R_res *= scaling

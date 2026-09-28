@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
 
-from physics import R_model, precompute_kinematics
+from physics import R_model, R_model_separated, precompute_kinematics
 
 mytrapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 
@@ -150,12 +150,12 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
     ## - calculate model value smoothly across plot range
     grid = np.linspace(plot_lo - 0.05, plot_hi + 0.05, 5000)
     kinematics = precompute_kinematics(grid, setup)
-    Rtot, Rbase, Rbg = R_model(bare_masses, g, b, baseline, kinematics, setup)
+    Rtot, Rbase, Rbg = R_model_separated(bare_masses, g, b, baseline, kinematics, setup)
 
     ##  - calculate pull distribution
     ## calculate model value at each datapoint for pulls
     kinematics_atData = precompute_kinematics(x, setup)
-    Rtot_atData, _, _ = R_model(bare_masses, g, b, baseline, kinematics_atData, setup)
+    Rtot_atData = R_model(bare_masses, g, b, baseline, kinematics_atData, setup)
     ## choose the right sigma
     pull_sigma = np.where(Rtot_atData >= y, eyh, eyl)
     pulls = (Rtot_atData - y) / pull_sigma

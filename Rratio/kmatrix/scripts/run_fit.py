@@ -53,7 +53,7 @@ if __name__ == "__main__":
                        jitter=fit_cfg.get("jitter"))
 
     ## sanity check - is the complex part of R_model = 0?
-    R, _, _ = fitter.evaluate(x)
+    R = fitter.evaluate(x)
     if not np.all(R.imag == 0):
         print("[FITTER INFO] ***WARNING***")
         print("              check the R_model as it is returning some complex values")
