@@ -143,6 +143,11 @@ class AsymChi2:
         self.param_spec = param_spec
         self.setup = channel_setup
         self.kinematics = precompute_kinematics(self.x, channel_setup)
+        ## penalty term:
+        self.penalty_sqrt_s  = 9.0                      ## far away from oc threshold
+        self.penalty_r_max   = 3.55                     ## the limit value for the model as R_udsc
+        self.penalty_sigma   = 0.10*self.penalty_r_max  ## % theory uncert on predicted R_udsc * value of R_udsc using
+        self.kinematics_penalty = precompute_kinematics(np.array([self.penalty_sqrt_s]), channel_setup)
 
     def __call__(self, par):
         bare_masses, g, b, baseline = self.param_spec.unpack(par)
@@ -150,7 +155,17 @@ class AsymChi2:
         if not np.all(np.isfinite(m)):
             return 1e12
         sigma = np.where(m >= self.y, self.eyh, self.eyl)
-        return np.sum(((m.real - self.y) / sigma) ** 2) ## use real part only, m.imag should be 0 anyway
+        chi2 = np.sum(((m.real - self.y) / sigma) ** 2) ## use real part only, m.imag should be 0 anyway
+
+        ## penalty term:
+        r_limit, _, _ = R_model(bare_masses, g, b, baseline,
+                     self.kinematics_penalty, self.setup)
+        r_limit = r_limit[0].real ## 1 element array and only want real part
+        if r_limit > self.penalty_r_max:
+            chi2 += ((r_limit - self.penalty_r_max) / self.penalty_sigma) ** 2
+        return chi2
+
+        return 
 
 
 ## ------------------------------------------------------------------ fit driver
