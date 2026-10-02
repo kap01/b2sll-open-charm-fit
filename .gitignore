@@ -5,3 +5,4 @@ Rratio/kmatrix/src/__pycache__/*
 *_dev.py
 *_new.py
 *.root
+dev*
