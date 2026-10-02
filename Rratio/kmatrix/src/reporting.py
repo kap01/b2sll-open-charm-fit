@@ -12,17 +12,23 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
+## suppress warnings about the complex numbers as we have to drop the complex
+## property to plot them
+import warnings
+warnings.filterwarnings('ignore', category=np.exceptions.ComplexWarning)
 
 from physics import R_model, R_model_separated, precompute_kinematics
 
 mytrapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 
-plt.rcParams.update({'font.family': 'serif',
+mpl_presets = {'font.family': 'serif',
                       'mathtext.fontset': 'stix',
                       'axes.labelsize': 16,
                       'xtick.labelsize': 12, 'ytick.labelsize': 12,
                       'legend.fontsize': 13, 'axes.titlesize': 18,
-                      })
+                      }
+
+plt.rcParams.update(mpl_presets)
 
 colourList = ["mediumvioletred", "#FF3EB7", "orchid", "whitesmoke", "#8AD291", "limegreen", "#36742D"]
 my_cmap = LinearSegmentedColormap.from_list('my_cmap', colourList)
@@ -38,10 +44,12 @@ def limit_warning(m, param_spec):
             continue
         result = m.values[name]
         # print(f"[TEMP READOUT CHECK] {name} {result} {lims[0]} {lims[1]}")
-        if abs(result-lims[0]) < abs(0.0001*result):
+        if np.isclose(result, lims[0]):
+        # if abs(result-lims[0]) < abs(0.0001*result):
             print(f"[REPORT INFO] ***WARNING***")
             print(f"              parameter {name} has converged at lower limit {result}")
-        elif abs(result-lims[1]) < abs(0.0001*result):
+        elif np.isclose(result, lims[1]):
+        # elif abs(result-lims[1]) < abs(0.0001*result):
             print(f"[REPORT INFO] ***WARNING***")
             print(f"              parameter {name} has converged at upper limit {result}")
     return
@@ -186,45 +194,54 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
             # label=r"K-matrix fit ($\chi^2/\mathrm{ndf}=%.2f$)" % (m.fval/(len(x)-m.nfit)))
 
     ax.set_xlim(plot_lo, plot_hi)
-    # ymin, ymax = ax.get_ylim()
-    # ax.set_ylim(ymin, ymin + (ymax - ymin) * 1.12)   ## headroom for the labels below
-    ax.set_ylim(1.85, 5.2) ## to match prev code
+    ymin, ymax = ax.get_ylim()
+    ax.set_ylim(ymin, ymin + (ymax - ymin) * 1.18)   ## headroom for the labels below
+    # ax.set_ylim(1.85, 5.2) ## to match prev code
 
     zorder=0
     first_loop=True
     for i in setup.open_charm_idxs: ## don't know where the ee (i.e. non-o-c) channels are
         m_threshold = setup.masses[i] + setup.masses2[i]
-        ax.axvline(m_threshold, color="deepskyblue", ls="-.", lw=0.9, zorder=zorder)
-        y_pos = ax.get_ylim()[1] * 0.953
-        if not first_loop:
-            if m_threshold-m_threshold_prev < 0.01:
-                y_pos -= 0.27
-        ax.text(
-            m_threshold, y_pos, setup.tex[i], rotation='vertical',
-            ha="center", va="center", fontsize=9, color="deepskyblue",
-            bbox=dict(facecolor="white", edgecolor="none", pad=0.5), zorder=zorder
-        )
-        m_threshold_prev = m_threshold
-        first_loop=False
+        if (m_threshold<plot_lo) or (m_threshold>plot_hi):
+            print(f"[REPORT INFO] channel {i} with threshold {m_threshold} is out of plot range [{plot_lo}, {plot_hi}], omitting from plot")
+        else:
+            ax.axvline(m_threshold, color="deepskyblue", ls="-.", lw=0.9, zorder=zorder)
+            y_pos = ax.get_ylim()[1] * 0.953
+            if not first_loop:
+                if m_threshold-m_threshold_prev < 0.01:
+                    y_pos -= 0.27
+            ax.text(
+                m_threshold, y_pos, setup.tex[i], rotation='vertical',
+                ha="center", va="center", fontsize=9, color="deepskyblue",
+                bbox=dict(facecolor="white", edgecolor="none", pad=0.5), zorder=zorder
+            )
+            m_threshold_prev = m_threshold
+            first_loop=False
         zorder+=1
 
     mass_names = {param_spec.names[i] for i in param_spec.res_mass_idx}
     for name, val in zip(param_spec.names, par):
         if name in mass_names:
-            ax.axvline(val, color="darkorange", ls=":", lw=0.8, zorder=zorder)
-            # ax.text(val, ax.get_ylim()[1] * 0.995, "$"+name+"$", ha="right", va='top', fontsize=11, color="darkorange")
-            ax.text(
-                val, ax.get_ylim()[1] * 0.99,"$"+name+"$", 
-                ha="center", va="top", fontsize=11, color="darkorange",
-                bbox=dict(facecolor="white", edgecolor="none", pad=1), zorder=zorder
-            )
+            if (val<plot_lo) or (val>plot_hi):
+                print(f"[REPORT INFO] resonance {name} with {val} is out of plot range [{plot_lo}, {plot_hi}], omitting from plot")
+            else:
+                ax.axvline(val, color="darkorange", ls=":", lw=0.8, zorder=zorder)
+                # ax.text(val, ax.get_ylim()[1] * 0.995, "$"+name+"$", ha="right", va='top', fontsize=11, color="darkorange")
+                ax.text(
+                    val, ax.get_ylim()[1] * 0.99,"$"+name+"$", 
+                    ha="center", va="top", fontsize=11, color="darkorange",
+                    bbox=dict(facecolor="white", edgecolor="none", pad=1), zorder=zorder
+                )
         zorder+=1
         
 
     ax.set_ylabel(r"$R = \sigma_{\rm had}/\sigma_{\mu\mu}$")
     ax.set_title(f"Coupled-channel K-matrix fit ({setup.N_ch} channels, "
                     f"{len(param_spec.res_mass_idx)} resonances)")
-    ax.legend(loc="lower right")
+    if plot_lo >= 3.55:
+        ax.legend(loc="lower right")
+    else:
+        ax.legend(loc="upper left")
 
     # axis[1].bar(data_edges[:-1], pulls, width=0.8*data_widths, color=pull_colours,
                 # align='edge', edgecolor="none", zorder=5)

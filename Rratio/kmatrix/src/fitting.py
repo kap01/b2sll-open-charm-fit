@@ -226,7 +226,13 @@ class KMatrixFit:
                     if not self.minuit.fixed[self.param_spec.names[i]]:
                         sigma = jitter.get(self.param_spec.kind_of(i), 0.0)
                         if sigma:
-                            init[i] += rng.normal(0, sigma)
+                            new_init = init[i] + rng.normal(0, sigma)
+                            ## ensure not gone out of parameter's fit limits with the jitter
+                            if new_init < self.param_spec.limits[i][0]:
+                                new_init = self.param_spec.limits[i][0]
+                            elif new_init > self.param_spec.limits[i][1]:
+                                new_init = self.param_spec.limits[i][1]
+                            init[i] = new_init
             m = self.new_minuit(init)
             try:
                 m.migrad(ncall=400000)
