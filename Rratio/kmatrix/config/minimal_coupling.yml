@@ -1,0 +1,204 @@
+# -----------------------------------------------------------------------
+# Example config for the generalised K-matrix fit. Reproduces the original
+# 4-channel / 3-resonance setup, but any number of channels or resonances
+# can be added just by extending the lists below -- no code changes needed.
+#
+# Every fitted quantity is given as {start: <value>, limits: [<lo>, <hi>]}
+# so starting value and bounds are never ambiguous.
+# -----------------------------------------------------------------------
+
+paths:
+  user_path: "/users/sd22284/b2sll_open_charm/repo/Rratio/"
+  data_path: 
+     - "data/BES2002/ins552757-v1.root"
+     - "data/BESII2006A/table_2.root"
+  save_path: "systematic_04_minimal_coupling_widerlimits"
+
+constants:
+  z0: 1.4        # Blatt-Weisskopf radius; alternatively give q0 (z0 = 1/q0)
+
+plotting:
+  limits:
+    low: 3.55
+    high: 4.85
+  group_tex:
+    ee      : '$e^{+}e^{-}$'
+    DD      : '$D\overline{D}$'
+    DstDst  : '$D^{*}\overline{D}^{*}$'
+    DsDs    : '$D_{s}\overline{D}_{s}$'
+    DstD    : '$D^{*}\overline{D}$'
+    DstDs   : '$D^{*}_{s}\overline{D}_{s}$'
+    DstDsts : '$D^{*}_{s}\overline{D}^{*}_{s}$'
+  source_tex:
+     - "BES 2002"
+     - "BESII 2006A"
+fit:
+  fit_range:
+    low : 3.55
+    high: 4.85
+  n_starts: 3
+  seed: 1
+  jitter:                # std-dev of the random restart jitter, by parameter kind
+    mass: 0.02
+    coupling: 0.4
+    baseline: 0.0
+
+# ---- channels ----------------------------------------------------------
+# role: production   marks the single channel the photon couples to (e+e-)
+# open_charm: true    marks channels summed over in the R-ratio
+# coupling_group      channels sharing a group share ONE coupling per
+#                      resonance (e.g. D+D- and D0D0bar both use "DD",
+#                      matching the isospin symmetry in the original model)
+channels:
+  - name: ee
+    mass : 0.000511
+    mass2: 0.000511
+    oam: 0
+    role: production
+    tex : '$e^{+}e^{-}$'
+    coupling_group: ee
+
+  - name: D0D0bar
+    mass : 1.86484
+    mass2: 1.86484
+    oam: 1
+    coupling_group: DD
+    open_charm: true
+    tex : '$D^{0}\overline{D}^{0}$'
+
+  - name: DpDm
+    mass : 1.86966
+    mass2: 1.86966
+    oam: 1
+    coupling_group: DD
+    open_charm: true
+    tex: '$D^{+}D^{-}$'
+
+  - name: Dst0D0
+    mass : 2.00685
+    mass2: 1.86484
+    oam: 1
+    coupling_group: DstD
+    open_charm: true
+    tex: '$D^{*0}\overline{D}^{0}$'
+
+  - name: DstpDm
+    mass : 2.01026
+    mass2: 1.86966
+    oam: 1
+    coupling_group: DstD
+    open_charm: true
+    tex: '$D^{*+}\overline{D}^{-}$'
+
+  - name: DsDs
+    mass : 1.96835
+    mass2: 1.96835
+    oam: 1
+    coupling_group: DsDs
+    open_charm: true
+    tex: '$D_{s}\overline{D}_{s}$'
+
+  - name: Dst0Dst0
+    mass : 2.00685
+    mass2: 2.00685
+    oam: 1
+    coupling_group: DstDst
+    open_charm: true
+    tex: '$D^{*0}\overline{D}^{*0}$'
+
+  - name: DstpDstm
+    mass : 2.01026
+    mass2: 2.01026
+    oam: 1
+    coupling_group: DstDst
+    open_charm: true
+    tex: '$D^{*+}D^{*-}$'
+
+  - name: DstsDs
+    mass : 2.1122
+    mass2: 1.96835
+    oam: 1
+    coupling_group: DstDs
+    open_charm: true
+    tex: '$D^{*}_{s}\overline{D}_{s}$'
+
+  - name: DstDsts
+    mass : 2.1122
+    mass2: 2.1122
+    oam: 1
+    coupling_group: DstDsts
+    open_charm: true
+    tex: '$D^{*}_{s}\overline{D}^{*}_{s}$'
+
+# ---- resonances ---------------------------------------------------------
+# `label` is used to build parameter names: M_<label>, g_<label>_<group>.
+# `couplings` must give one entry per coupling group used by the channels
+# above (here: ee, DD, DstDst).
+resonances:
+  - label: "1" ## trying to make this the psi(3770)
+    mass:
+      start: 3.773
+      limits: FIXED
+    couplings:
+      ee:    {start: 0.30, limits: [-10.0, 10.0]}
+      DD:    {start: 0.50, limits: [-10.0, 10.0]}
+      DsDs:  {start: 0.0, limits: "FIXED"} 
+      DstDst: {start: 0.0, limits: "FIXED"}  
+      DstD:   {start: 0.0, limits: "FIXED"} 
+      DstDs:  {start: 0.0, limits: "FIXED"} 
+      DstDsts: {start: 0.0, limits: "FIXED"} 
+
+  - label: "2"
+    mass:
+      start: 4.010 ## could be near the psi(4040)?
+      limits: [3.83, 4.12]
+    couplings:
+      ee:  {start: 0.60, limits: [-8.0, 8.0]}
+      DD:  {start: 0.30, limits: [-10.0, 10.0]}
+      DsDs:  {start: 0.10, limits: [-8.0, 8.0]}
+      DstDst: {start: 0.60, limits: [-8.0, 8.0]}
+      DstD: {start: 0.10, limits: [-8.0, 8.0]}
+      DstDs: {start: 0.0, limits: "FIXED"} 
+      DstDsts: {start: 0.0, limits: "FIXED"} 
+
+  - label: "3"
+    mass:
+      start: 4.190 ## looks like psi(4160)
+      limits: [4.12, 4.30]
+    couplings:
+      ee:  {start: 0.40, limits: [-8.0, 8.0]}
+      DD:  {start: 0.30, limits: [-10.0,10.0]}
+      DsDs:  {start: 0.10, limits: [-8.0, 8.0]}
+      DstDst: {start: 0.60, limits: [-8.0, 8.0]}
+      DstD: {start: 0.10, limits: [-8.0, 8.0]}
+      DstDs: {start: 0.10, limits: [-8.0, 8.0]}
+      DstDsts: {start: 0.0, limits: "FIXED"} 
+      
+  - label: "4" ## looks like psi(4415)
+    mass:
+      start: 4.421
+      limits: [4.30, 4.50]
+    couplings:
+      ee:  {start: 0.40, limits: [-8.0, 8.0]}
+      DD:  {start: 0.30, limits: [-10.0, 10.0]}
+      DsDs:  {start: 0.10, limits: [-8.0, 8.0]}
+      DstDst: {start: 0.60, limits: [-8.0, 8.0]}
+      DstD: {start: 0.10, limits: [-8.0, 8.0]}
+      DstDs: {start: 0.10, limits: [-8.0, 8.0]}
+      DstDsts: {start: 0.5, limits: [-8.0, 8.0]}
+      
+# ---- non-resonant continuum ---------------------------------------------
+# baseline: the flat R_uds light-quark contribution
+# couplings: coherent continuum amplitude per coupling group (b_DD, b_Dst);
+#            the production channel never gets one -- it's fixed to 0
+continuum:
+  baseline:
+    name: R_uds
+    start: 2.171
+    limits: "FIXED" ## [1.8, 2.6] ##
+  couplings:
+    DD:  {start: 0.5, limits: [-8.0, 8.0]}
+    DsDs:  {start: 0.3, limits: [-8.0, 8.0]}
+    DstDst: {start: 0.3, limits: [-8.0, 8.0]}
+    DstD: {start: 0.10, limits: [-8.0, 8.0]}
+    DstDs: {start: 0.10, limits: [-8.0, 8.0]}
