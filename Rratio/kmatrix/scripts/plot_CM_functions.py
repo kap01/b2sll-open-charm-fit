@@ -10,7 +10,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 import numpy as np
 
 from chew_mandelstams import Chew_Mandelstamm, make_CM_plot
-from loading import load_config, validate_config, build_channel_setup
+from loading import load_config, build_channel_setup
 
 if __name__ == "__main__":
 
@@ -18,7 +18,6 @@ if __name__ == "__main__":
     CONFIG_FILE = user_path + "kmatrix/config/safe_config.yml"
 
     config = load_config(CONFIG_FILE)
-    # validate_config(config) ## - don't need it to be physcally validated with couplings etc
 
     setup = build_channel_setup(config)
 
@@ -30,7 +29,7 @@ if __name__ == "__main__":
     plot_limits = config["plotting"]["limits"]
     s_min = plot_limits["low"] ** 2
     s_max = plot_limits["high"] ** 2
-    s_vals = np.linspace(s_min, s_max, 250)
+    s_vals = np.linspace(s_min, s_max, 1000)
     q0_val = 1.0 / setup.z0
 
     # --- loop over all channels using index-aligned arrays from ChannelSetup
