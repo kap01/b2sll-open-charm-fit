@@ -9,7 +9,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 import numpy as np
 
-from chew_mandelstams import Chew_Mandelstamm, make_CM_plot
+from chew_mandelstams import Chew_Mandelstamm, make_CM_plot, save_lookup_table
 from loading import load_config, build_channel_setup
 
 if __name__ == "__main__":
@@ -39,8 +39,10 @@ if __name__ == "__main__":
         oam   = setup.oam[i]
         tex   = setup.tex[i]
 
+
         cm_vals = Chew_Mandelstamm(s_vals, mass1, mass2, oam, q0_val=q0_val)
 
         out_pdf = f"{today}/{outfolder}/{name}.pdf"
         make_CM_plot(cm_vals, s_vals, mass1, mass2, oam, tex, out_pdf=out_pdf)
-    
+        out_txt = f"{user_path}/kmatrix/includes/{outfolder}__z0_{setup.z0}__{name}.txt"
+        save_lookup_table(cm_vals, s_vals, out_txt=out_txt)

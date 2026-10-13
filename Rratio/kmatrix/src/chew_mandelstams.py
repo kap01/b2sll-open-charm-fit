@@ -18,6 +18,7 @@ from ampform.dynamics import (
     PhaseSpaceFactor,
     PhaseSpaceFactorComplex,
 )
+from ampform.dynamics.phasespace import ChewMandelstamSWave
 from ampform.io import aslatex
 from ampform.sympy import unevaluated
 from ampform.sympy.math import ComplexSqrt
@@ -62,40 +63,40 @@ class BreakupMomentum(sp.Expr):
         q_squared = BreakupMomentumSquared(s, m1, m2)
         return ComplexSqrt(q_squared)
 
-
 @unevaluated
-class ChewMandelstamSWave(sp.Expr):
+class equalChewMandelstamSWave(sp.Expr):
     s: Any
     m1: Any
-    m2: Any
     _latex_repr_ = R"\Sigma\left({s}\right)"
 
     def evaluate(self) -> sp.Expr:
         # evaluate=False in order to keep same style as PDG
-        s, m1, m2 = self.args
-        q = BreakupMomentum(s, m1, m2)
-        left_term = sp.Mul(
-            2 * q / sp.sqrt(s),
-            sp.log((m1**2 + m2**2 - s + 2 * sp.sqrt(s) * q) / (2 * m1 * m2)),
-            evaluate=False,
-        )
-        right_term = (m1**2 - m2**2) * (1 / s - 1 / (m1 + m2) ** 2) * sp.log(m1 / m2)
+        s, m1 = self.args
+        sth = 4 * m1**2
+        # q = BreakupMomentum(s, m1, m1)
+        # left_term = sp.Mul(
+        #     2 * q / sp.sqrt(s),
+        #     sp.log((2 * m1**2 - s + 2 * sp.sqrt(s) * q) / (2 * m1**2)),
+        #     evaluate=False,
+        # )
+        sqrt_ratio = ComplexSqrt(s/(sth - s))
         return sp.Mul(
-            1 / (16 * sp.pi**2),
-            left_term - right_term,
+            1 / (8 * sp.pi**2),
+            -1/sqrt_ratio * sp.atan(sqrt_ratio),
             evaluate=False,
         )
+        
 @unevaluated
-class ChewMandelstamPWave(sp.Expr):
+class equalChewMandelstamPWave(sp.Expr):
     s: Any
     m1: Any
-    m2: Any
     q0: Any  # the effective momentum scale
     _latex_repr_ = R"\Sigma_P\left({s}\right)"
 
     def evaluate(self) -> sp.Expr:
-        s, m1, m2, q0 = self.args
-        s_thr = (m1 + m2) ** 2
+        s, m1, q0 = self.args
+        m2 = m1
+        s_thr = 4 * m1** 2
         s0 = 4 * q0**2
 
         q_sq = BreakupMomentumSquared(s, m1, m2)  # reuse existing class from notebook
@@ -152,7 +153,8 @@ class normalised_PhaseSpaceFactor(sp.Expr):
 
 ## ---- CONVERT CLASSES INTO EXPRESSIONS ---- ##
 cmsw_expr = ChewMandelstamSWave(s, m1, m2)
-cmpw_expr = ChewMandelstamPWave(s, m1, m2, q0)
+cmesw_expr = equalChewMandelstamSWave(s, m1)
+cmepw_expr = equalChewMandelstamPWave(s, m1, q0)
 # - different format expression as has the maths inside using the above class:
 integrand = (normalised_PhaseSpaceFactor(s_prime, m1, m2) * FormFactor(s_prime, m1, m2, L, q0)) / (
     (s_prime - s_thr) * (s_prime - s - epsilon * sp.I)
@@ -167,7 +169,8 @@ integrand = (normalised_PhaseSpaceFactor(s_prime, m1, m2) * FormFactor(s_prime, 
 
 ## ---- CONVERT EXPRESSIONS INTO LAMBDAS  ---- ##
 cmsw_func = sp.lambdify((s_prime, m1, m2, epsilon), cmsw_expr.doit().subs(s, s_plus))
-cmpw_func = sp.lambdify((s_prime, m1, m2, q0, epsilon), cmpw_expr.doit().subs(s, s_plus))
+cmesw_func = sp.lambdify((s_prime, m1, epsilon), cmesw_expr.doit().subs(s, s_plus))
+cmepw_func = sp.lambdify((s_prime, m1, q0, epsilon), cmepw_expr.doit().subs(s, s_plus))
 integrand_func = sp.lambdify(
     args=(s_prime, s, L, epsilon, m1, m2, q0),
     expr=integrand.doit(),
@@ -203,35 +206,45 @@ def CMfunc_general_integral(s_vals, m1_val, m2_val, oam_val, q0_val=1.0, epsilon
     )[0]
     return (s_vals - s_thr_val) / (unnorm_BlattWeiss[oam_val]*np.pi) * integral_result
 
-# - analytical form of the S wave, same function for equal and inequal mass as minimal time saving in evaluatino
+# - analytical form of the S wave, same function for inequal mass as minimal time saving in evaluatino
 def CMfunc_S_wave(s_vals, m1_val, m2_val, epsilon_val=0.0001):
     # - note that epsilon_val should be unused
     return np.array([
-        cmsw_func(s,  m1=m1_val, m2=m2_val, epsilon=epsilon_val)
+        cmsw_func(s, m1=m1_val, m2=m2_val, epsilon=epsilon_val)/(16*np.pi) ## ampform S wave function is normalised differently
+        for s in s_vals])
+
+# - analytical form of the S wave, same function for equal mass 
+#   avoids noise due to use of log in non-equal mass form
+def CMfunc_S_wave_equalmass(s_vals, m1_val, epsilon_val=0.000001):
+    # - note that epsilon_val should be unused
+    return np.array([
+        cmesw_func(s, m1=m1_val, epsilon=epsilon_val)
         for s in s_vals])
 
 # - analytical form of the equal mass P wave
-def CMfunc_P_wave_equalmass(s_vals, m1_val, m2_val, q0_val, epsilon_val=0.0001):
+def CMfunc_P_wave_equalmass(s_vals, m1_val, q0_val, epsilon_val=0.0001):
     # - note that epsilon_val should be unused
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in sqrt")
         return np.array([
-            cmpw_func(s, m1=m1_val, m2=m2_val, q0=q0_val, epsilon=epsilon_val)
+            cmepw_func(s, m1=m1_val, q0=q0_val, epsilon=epsilon_val)
             for s in s_vals
         ])
  
 # - wrapper function
 def Chew_Mandelstamm(s_vals, m1_val, m2_val, oam_val, q0_val=1.0, epsilon_val=0.0001):
-    print(f"\033[1;93m[CM INFO]\033[0m Computing Chew-Mandelstam for m1={m1_val}, m2={m2_val}, L={oam_val}")
-    if oam_val == 0:
-        return CMfunc_S_wave(s_vals, m1_val, m2_val)
-    elif oam_val == 1 and np.isclose(m1_val, m2_val, 0.000001):
-        return CMfunc_P_wave_equalmass(s_vals, m1_val, m2_val, q0_val, epsilon_val)
+    print(f"\033[1;93m[CM INFO]\033[0m Computing Chew-Mandelstam for m1={m1_val}, m2={m2_val}, L={oam_val}...")
+    if np.isclose(m1_val, m2_val, 0.000001) and oam_val==0:
+        return CMfunc_S_wave_equalmass(s_vals, m1_val, epsilon_val)
+    elif np.isclose(m1_val, m2_val, 0.000001) and oam_val==1:
+        return CMfunc_P_wave_equalmass(s_vals, m1_val, q0_val, epsilon_val)
+    elif oam_val == 0:
+        return CMfunc_S_wave(s_vals, m1_val, m2_val, epsilon_val)
     else:
         return CMfunc_general_integral(s_vals, m1_val, m2_val, oam_val, q0_val, epsilon_val)
 
 
-## ---- PLOTTING ---- ##
+## ---- SAVING ---- ##
 real_style = {"label": "Real part", "c": "deeppink"}
 imag_style = {"label": "Imag part", "c": "forestgreen", "linestyle": "-."}
 threshold_style = {"label": R"$s_\mathrm{thr}$", "c": "deepskyblue", "linewidth": 0.9, "linestyle":"dotted"}
@@ -265,3 +278,12 @@ def make_CM_plot(cm_vals, s_vals, m1_val, m2_val, oam_val, channelname, out_pdf=
         return None
     else:
         return fig
+
+def save_lookup_table(cm_vals, s_vals, out_txt=None):
+    save_info = np.vstack([cm_vals, s_vals])
+    if out_txt is not None:
+        np.savetxt(out_txt, save_info)
+        print(f"\033[1;93m[CM INFO]\033[0m lookup table saved to {out_txt}")
+        return None
+    else:
+        return save_info
