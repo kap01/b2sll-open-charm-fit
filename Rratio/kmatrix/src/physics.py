@@ -31,7 +31,6 @@ anywhere in this module.
 """
 
 import numpy as np
-from functools import lru_cache
 from scipy import integrate
 
 
@@ -50,15 +49,12 @@ def breakup_q2(s, m1, m2=None):
 
 def breakup_q(q2):
     """Principal-branch analytic continuation of q(s) = sqrt(q^2(s))."""
-    return np.sqrt(q2) ## CHECK COMPLEX OK
+    return np.sqrt(q2)
 
 def s_threshold(m1, m2):
     return (m1+m2)**2
 
 def phsp_function(sqrt_s, q):
-    # rho = np.zeros((s.shape[0], N_ch))
-    # for i in range(N_ch):
-        # rho[:, i] = np.real(q[i] / (8.0 * np.pi * np.sqrt(s)))
     rho = np.real(q / (8.0 * np.pi * sqrt_s))
     return rho        
 
@@ -87,57 +83,73 @@ def vertex_factor_sq(q2, l, z0):
 
 ## keep with above as both useful in later development
 def vertex_factor(vfs):
-    return np.sqrt(vfs) ## CHECK COMPLEX OK HERE
-
-## build the above into the vector structure for all channels together
-# def vertex_factor_vector(q2, l, z0):
-#     """The matrix with dim (N_ch, N_ch) and diagonal elements of the
-#     vertex factors (not squared)."""
-#     N_ch = setup.N_ch
-#     n = np.zeros((s.shape[0], N_ch), dtype=complex)
-#     for i in range(N_ch):
-#         n[:, i] = np.sqrt(vertex_factor(q2, l, z0))
-#     return n
+    return np.sqrt(vfs) 
 
 ## ------------------------------------------------------------- Self energy
 def Pi_function_0(s, sth):
     """s = array of s values, sth = threshold centre of mass energy, so for 
     a given channel expect (m1+m2)^2 (in the complicated maths, is the branchcut 
-    between the Riemann sheets)"""
-    # term1 = np.sqrt(sth/s -1, dtype=complex) ## CHECK COMPLEX HERE OK
-    # term2 = 1/term1 ## CHECK COMPLEX HERE OK
-    # return -term1 * np.arctan(term2)
+    between the Riemann sheets)
+    Manually change the sign of the imag part to compensate for numpy.sqrt 
+    approaching the pole from the wrong direction"""
     arg = np.sqrt(s/(sth - s))
-    return -1./arg * np.arctan(arg)
+    wrongsign =  -1./arg * np.arctan(arg)
+    return wrongsign.real - wrongsign.imag * 1j
 
 
 def Pi_function_1(s, z0, sth):
     """s = array of s values, z0 = radius as usual, sth = threshold
     centre of mass energy, so for a given channel expect (m1+m2)^2
-    (in the complicated maths, is the branchcut between the Riemann sheets)"""
+    (in the complicated maths, is the branchcut between the Riemann sheets)
+    Manually change the sign *if* a pole exists (even though it cancels) to
+    compensate for numpy.sqrt giving wrong root"""
     s0 = 4 / (z0**2)
-
-    # term1 = np.sqrt(s0 / (s0-sth)) ## CHECK COMPLEX HERE OK
-    # term2 = 1/term1 ## CHECK COMPLEX HERE OK
-    # term3 = s0 / (s+s0-sth) ## CHECK COMPLEX HERE OK
-    # return term1 * term3 * np.arctanh(term2)
-    return (s**1.5) / (np.sqrt(complex(s0)) * (s0 - sth) * (s + s0 - sth)) \
-           * np.arctanh(np.sqrt(complex(1.0 - sth / s0)))
-
-
-
-def Chew_Mandelstamm(s, q2, l, z0, sth):
-    prefactor = 1/(8*np.pi**2)
-    Pi0 = Pi_function_0(s, sth)
-    if l == 0:
-        return prefactor*Pi0
-    elif l==1:
-        Pi1 = Pi_function_1(s, z0, sth)
-        BWsq = Blatt_Weisskopf_sq(q2, l, z0)
-        sTerm = 0.25*(s-sth)*z0**2
-        return prefactor * sTerm * (BWsq*Pi0 + Pi1)
+    if s0 < sth:
+        sign = -1
     else:
-        raise ValueError(f"orbital angular momentum L={l} not implemented (only L=0,1)")
+        sign = 1
+    term1 = (s0**1.5) / (np.sqrt(s0-sth) * (s + s0 - sth))
+    term2 = np.sqrt(1-sth/s0)
+    return term1 * np.arctanh(term2) * sign
+
+def Swave_Chew_Mandelstamm(s, sth, m1, m2, q):
+    """Chew-Mandelstam self-energy for an S-wave (L=0) channel with unequal
+    particle masses m1 != m2.
+    Implements PDG 2022 Review, Section 50.3.5, Eq. (50.40):
+        Sigma(s) = 1/(16 pi^2) * [
+              2 q(s) / sqrt(s)
+                * log( (m1^2 + m2^2 - s + 2 sqrt(s) q(s)) / (2 m1 m2) )
+            - (m1^2 - m2^2) * (1/s - 1/s_+) * log(m1 / m2)
+    """
+    # First term: (2q/sqrt(s)) * log( (m1^2 + m2^2 - s + 2*sqrt(s)*q) / (2*m1*m2) )
+    log_arg = (m1**2 + m2**2 - s + 2.0 * np.sqrt(s) * q) / (2.0 * m1 * m2)
+    term1   = (2.0 * q / np.sqrt(s)) * np.log(log_arg)
+ 
+    # Second term: -(m1^2 - m2^2) * (1/s - 1/s_+) * log(m1/m2)
+    # This term is zero for equal masses and ensures Sigma(s_+) = 0.
+    term2   = -(m1**2 - m2**2) * (1.0 / s - 1.0 / sth) * np.log(m1 / m2)
+ 
+    return (term1 + term2) / (16.0 * np.pi**2)
+
+
+
+def Chew_Mandelstamm(s, l, q, q2, z0, m1, m2):
+    prefactor = 1/(8*np.pi**2)
+    sth = s_threshold(m1, m2)
+    if np.isclose(m1, m2):
+        Pi0 = Pi_function_0(s, sth)
+        if l == 0:
+            return prefactor*Pi0
+        elif l==1:
+            Pi1 = Pi_function_1(s, z0, sth)
+            BWsq = Blatt_Weisskopf_sq(q2, l, z0)
+            sTerm = 0.25*(s-sth)*z0**2
+            return prefactor * sTerm * (BWsq*Pi0 + Pi1)
+    else:
+        if l == 0:
+            return Swave_Chew_Mandelstamm(s, sth, m1, m2, q)
+        else:
+            raise ValueError(f"orbital angular momentum L={l} not implemented (only L=0) for inequal masses")
 
 ## ------------------------------------------------------------- save kinematics
 class Kinematics:
@@ -179,14 +191,13 @@ def precompute_kinematics(sqrt_s, setup):
  
     for k in range(N_ch):
         m1, m2, l       = setup.masses[k].astype(complex), setup.masses2[k].astype(complex), setup.oam[k]
-        sth             = s_threshold(m1, m2)
         q2              = breakup_q2(s, m1, m2)## calculated separately to use in functions more easily
         q               = breakup_q(q2) 
         q2_arr[:, k]    = q2
         q_arr[:, k]     = q
         rho[:, k]       = phsp_function(sqrt_s, q)
         n[:, k, k]      = vertex_factor(vertex_factor_sq(q2, l, z0)) ## diagonal matrix
-        Sigma[:, k, k]  = Chew_Mandelstamm(s, q2, l, z0, sth)  ## diagonal matrix
+        Sigma[:, k, k]  = Chew_Mandelstamm(s, l, q, q2, z0, m1, m2)  ## diagonal matrix
         del m1, m2, l, q2, q ## variables to be used again next iteration
  
     return Kinematics(sqrt_s, s, q2_arr, q_arr, Sigma, n, rho)
