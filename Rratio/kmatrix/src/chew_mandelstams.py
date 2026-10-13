@@ -25,7 +25,7 @@ from scipy.integrate import quad_vec
 from sympy.printing.pycode import _unpack_integral_limits
 from tqdm.auto import tqdm
 
-from physics import s_threshold
+from dev_physics import s_threshold
 
 import matplotlib.pyplot as plt
 from reporting import mpl_presets
@@ -41,8 +41,15 @@ s_plus = s_prime + sp.I * epsilon
 s_thr = (m1 + m2) ** 2
 
 
+## ---- CONVERSION FOR BLATT WEISSKOPF ---- ##
+unnorm_BlattWeiss = {
+    0 : 1,
+    1 : 2,
+    2 : 13,
+    3 : 277,
+}
 
-## ---- CONVERT THE AMPFORM FUNCTIONS INTO CLASSES  ---- ##
+## ---- WRAP THE AMPFORM FUNCTIONS INTO CLASSES WITH OUR SYMPY SYMBOLS  ---- ##
 @unevaluated
 class BreakupMomentum(sp.Expr):
     s: Any
@@ -97,10 +104,10 @@ class ChewMandelstamPWave(sp.Expr):
         ff_sq = 1 / (1 + q_sq / q0**2)
 
         # Pi_0: note ComplexSqrt handles s > s_thr (below threshold) correctly
-        sqrt_ratio = ComplexSqrt((s_thr - s) / s)  # = sqrt((s_thr-s)/s)
+        sqrt_ratio = ComplexSqrt((s_thr - s) / s) 
         Pi0 = -sqrt_ratio * sp.atan(1 / sqrt_ratio)
 
-        # Pi_1: the pole from (s + s0 - s_thr) cancels exactly with F1^2 — see paper
+        # Pi_1: the pole from (s + s0 - s_thr) cancels exactly with F1^2
         Pi1 = (
             s0 ** sp.Rational(3, 2)
             / (ComplexSqrt(s0 - s_thr) * (s + s0 - s_thr))
@@ -131,21 +138,32 @@ class FormFactor(sp.Expr):
             angular_momentum=L,
         )
 
+@unevaluated
+class normalised_PhaseSpaceFactor(sp.Expr):
+    s: Any
+    m1: Any
+    m2: Any
+    
+    def evaluate(self) -> sp.Expr:
+        s, m1, m2 = self.args
+        return BreakupMomentum(s, m1, m2) / (8*sp.pi*sp.sqrt(s))
+
 
 
 ## ---- CONVERT CLASSES INTO EXPRESSIONS ---- ##
 cmsw_expr = ChewMandelstamSWave(s, m1, m2)
 cmpw_expr = ChewMandelstamPWave(s, m1, m2, q0)
 # - different format expression as has the maths inside using the above class:
-integrand = (PhaseSpaceFactor(s_prime, m1, m2) * FormFactor(s_prime, m1, m2, L, q0)) / (
+integrand = (normalised_PhaseSpaceFactor(s_prime, m1, m2) * FormFactor(s_prime, m1, m2, L, q0)) / (
     (s_prime - s_thr) * (s_prime - s - epsilon * sp.I)
 )
 # - diagnostic only:
 # q_expr = BreakupMomentum(s, m1, m2)
+# q2_expr = BreakupMomentumSquared(s, m1, m2)
 # rho_expr = PhaseSpaceFactorComplex(s, m1, m2)
 # na_expr = FormFactor(s, m1, m2, L, q0)
 # bl_expr = BlattWeisskopfSquared(z, L)
-
+# ff_expr = FormFactor(s, m1, m2, L, q0)
 
 ## ---- CONVERT EXPRESSIONS INTO LAMBDAS  ---- ##
 cmsw_func = sp.lambdify((s_prime, m1, m2, epsilon), cmsw_expr.doit().subs(s, s_plus))
@@ -156,7 +174,10 @@ integrand_func = sp.lambdify(
     modules="numpy",
 )
 # - diagnostic only:
+# q_func = sp.lambdify((s, m1, m2), q_expr.doit())
+# q2_func = sp.lambdify((s, m1, m2), q2_expr.doit())
 # rho_func = sp.lambdify(symbols, rho_expr.doit().subs(s, s_plus))
+# ff_func    = sp.lambdify((s, m1, m2, L, q0), ff_expr.doit())
 
 ## ---- FUNCTIONS TO ACTUALLY BE CALLED  ---- ##
 
@@ -180,7 +201,7 @@ def CMfunc_general_integral(s_vals, m1_val, m2_val, oam_val, q0_val=1.0, epsilon
         a=s_thr_val, 
         b=np.inf,
     )[0]
-    return (s_vals - s_thr_val) / np.pi * integral_result
+    return (s_vals - s_thr_val) / (unnorm_BlattWeiss[oam_val]*np.pi) * integral_result
 
 # - analytical form of the S wave, same function for equal and inequal mass as minimal time saving in evaluatino
 def CMfunc_S_wave(s_vals, m1_val, m2_val, epsilon_val=0.0001):
@@ -236,7 +257,7 @@ def make_CM_plot(cm_vals, s_vals, m1_val, m2_val, oam_val, channelname, out_pdf=
     ax.set_xlim(np.min(s_vals), np.max(s_vals))
     ax.set_xlabel(r"$s$ [GeV$^2$]", loc='right')
     ax.set_ylabel(r"$\Sigma(s)$", rotation=90, fontsize=20) ##text renders smaller
-    ax.set_title(f"Dispersion integral for {channelname} {X}-wave:\n$L={oam_val}$, $m_1={m1_val:.2f}$, $m_2={m2_val:.2f}$", fontsize=17)
+    ax.set_title(f"Chew Mandelstam function for {channelname} {X}-wave:\n$L={oam_val}$, $m_1={m1_val:.2f}$, $m_2={m2_val:.2f}$", fontsize=17)
 
     if out_pdf is not None:
         fig.savefig(out_pdf, bbox_inches='tight')
