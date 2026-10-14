@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""
-Text report and diagnostic plot for a completed KMatrixFit. Both take the
-ParameterSpec and ChannelSetup as arguments rather than assuming particular
-parameter or channel names, so they work unchanged for any number of
-channels / resonances.
-"""
-
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -17,22 +9,24 @@ from matplotlib.colors import LinearSegmentedColormap
 import warnings
 warnings.filterwarnings('ignore', category=np.exceptions.ComplexWarning)
 
+from chew_mandelstams import s_threshold
 from physics import R_model, R_model_separated, precompute_kinematics
 
 mytrapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 
-mpl_presets = {'font.family': 'serif',
-                      'mathtext.fontset': 'stix',
-                      'axes.labelsize': 16,
-                      'xtick.labelsize': 12, 'ytick.labelsize': 12,
-                      'legend.fontsize': 13, 'axes.titlesize': 18,
-                      }
+mpl_presets = { 'font.family': 'serif',
+                'mathtext.fontset': 'stix',
+                'axes.labelsize': 16,
+                'xtick.labelsize': 12, 'ytick.labelsize': 12,
+                'legend.fontsize': 13, 'axes.titlesize': 18,
+              }
 
 plt.rcParams.update(mpl_presets)
 
 colourList = ["mediumvioletred", "#FF3EB7", "orchid", "whitesmoke", "#8AD291", "limegreen", "#36742D"]
 my_cmap = LinearSegmentedColormap.from_list('my_cmap', colourList)
 
+###### ------- FITTING ------- #######
 
 def limit_warning(m, param_spec):
     """Warn if any of the fit parameters have hit their limits when
@@ -46,11 +40,11 @@ def limit_warning(m, param_spec):
         # print(f"[TEMP READOUT CHECK] {name} {result} {lims[0]} {lims[1]}")
         if np.isclose(result, lims[0]):
         # if abs(result-lims[0]) < abs(0.0001*result):
-            print(f"[REPORT INFO] ***WARNING***")
+            print(f"\033[1;93m[REPORT INFO]\033[0m ***WARNING***")
             print(f"              parameter {name} has converged at lower limit {result}")
         elif np.isclose(result, lims[1]):
         # elif abs(result-lims[1]) < abs(0.0001*result):
-            print(f"[REPORT INFO] ***WARNING***")
+            print(f"\033[1;93m[REPORT INFO]\033[0m ***WARNING***")
             print(f"              parameter {name} has converged at upper limit {result}")
     return
 
@@ -102,7 +96,7 @@ def save_conditions(param_spec, setup, limits, out_txt=None):
     if out_txt is not None:
         with open(out_txt, 'w') as outfile:
             outfile.write(text + "\n")
-        print(f"[REPORT INFO] conditions saved to {out_txt}")
+        print(f"\033[1;93m[REPORT INFO]\033[0m conditions saved to {out_txt}")
         return None
     else:
         print(text)
@@ -127,7 +121,7 @@ def report(m, param_spec, data, out_txt=None):
     if out_txt is not None:
         with open(out_txt, 'w') as outfile:
             outfile.write(text + "\n")
-        print(f"[REPORT INFO] fit result saved to {out_txt}")
+        print(f"\033[1;93m[REPORT INFO]\033[0m fit result saved to {out_txt}")
 
 
 def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
@@ -203,7 +197,7 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
     for i in setup.open_charm_idxs: ## don't know where the ee (i.e. non-o-c) channels are
         m_threshold = setup.masses[i] + setup.masses2[i]
         if (m_threshold<plot_lo) or (m_threshold>plot_hi):
-            print(f"[REPORT INFO] channel {i} with threshold {m_threshold} is out of plot range [{plot_lo}, {plot_hi}], omitting from plot")
+            print(f"\033[1;93m[REPORT INFO]\033[0m channel {i} with threshold {m_threshold} is out of plot range [{plot_lo}, {plot_hi}], omitting from plot")
         else:
             ax.axvline(m_threshold, color="deepskyblue", ls="-.", lw=0.9, zorder=zorder)
             y_pos = ax.get_ylim()[1] * 0.953
@@ -223,7 +217,7 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
     for name, val in zip(param_spec.names, par):
         if name in mass_names:
             if (val<plot_lo) or (val>plot_hi):
-                print(f"[REPORT INFO] resonance {name} with {val} is out of plot range [{plot_lo}, {plot_hi}], omitting from plot")
+                print(f"\033[1;93m[REPORT INFO]\033[0m resonance {name} with {val} is out of plot range [{plot_lo}, {plot_hi}], omitting from plot")
             else:
                 ax.axvline(val, color="darkorange", ls=":", lw=0.8, zorder=zorder)
                 # ax.text(val, ax.get_ylim()[1] * 0.995, "$"+name+"$", ha="right", va='top', fontsize=11, color="darkorange")
@@ -261,7 +255,7 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
 
     if out_pdf is not None:
         fig.savefig(out_pdf, bbox_inches='tight')
-        print(f"[REPORT INFO] plot saved to {out_pdf}")
+        print(f"\033[1;93m[REPORT INFO]\033[0m plot saved to {out_pdf}")
         return None
     else:
         return fig
@@ -320,7 +314,7 @@ def couplings_plot(m, param_spec, setup, config, out_pdf=None):
  
     if out_pdf is not None:
         fig.savefig(out_pdf, bbox_inches='tight')
-        print(f"[REPORT INFO] coupling plot saved to {out_pdf}")
+        print(f"\033[1;93m[REPORT INFO]\033[0m coupling plot saved to {out_pdf}")
         return None
     else:
         return fig
@@ -354,7 +348,56 @@ def plot_covariance(m, param_spec, out_pdf=None):
     if out_pdf is not None:
         fig.savefig(out_pdf, bbox_inches='tight')
         print
-        (f"[REPORT INFO] correlation plot saved to {out_pdf}")
+        (f"\033[1;93m[REPORT INFO]\033[0m correlation plot saved to {out_pdf}")
         return None
     else:
         return fig
+
+
+####### ------- CHEW MANDELSTAM SAVING ------- ######
+
+## ---- extra plot settings ---- ##
+real_style = {"label": "Real part", "c": "deeppink"}
+imag_style = {"label": "Imag part", "c": "forestgreen", "linestyle": "-."}
+threshold_style = {"label": R"$s_\mathrm{thr}$", "c": "deepskyblue", "linewidth": 0.9, "linestyle":"dotted"}
+
+## ---- plot the function ---- ##
+def make_CM_plot(cm_vals, s_vals, m1_val, m2_val, oam_val, channelname, out_pdf=None):
+    # - don't want to set of a warning when we split up the real and imag parts of cm_vals:
+    warnings.filterwarnings('ignore', category=np.exceptions.ComplexWarning)
+
+    X = ['S', 'P', 'D', 'F'][oam_val]
+    s_thr = s_threshold(m1_val, m2_val)
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    # - x axis
+    ax.axhline(0, color="black", linewidth=0.75)
+    # - mark the s_threshold
+    ax.axvline(s_thr, **threshold_style)
+    # - plot the components
+    ax.plot(s_vals, cm_vals.real, alpha=0.7, **real_style)
+    ax.plot(s_vals, cm_vals.imag, alpha=0.7, **imag_style)
+
+    # - graphics:
+    ax.legend()
+    ax.set_xlim(np.min(s_vals), np.max(s_vals))
+    ax.set_xlabel(r"$s$ [GeV$^2$]", loc='right')
+    ax.set_ylabel(r"$\Sigma(s)$", rotation=90, fontsize=20) ##text renders smaller
+    ax.set_title(f"Chew Mandelstam function for {channelname} {X}-wave:\n$L={oam_val}$, $m_1={m1_val:.2f}$, $m_2={m2_val:.2f}$", fontsize=17)
+
+    if out_pdf is not None:
+        fig.savefig(out_pdf, bbox_inches='tight')
+        print(f"\033[1;93m[CM INFO]\033[0m plot saved to {out_pdf}")
+        return None
+    else:
+        return fig
+
+## ---- save the table ---- ##
+def save_lookup_table(cm_vals, s_vals, out_txt=None):
+    save_info = np.vstack([cm_vals, s_vals])
+    if out_txt is not None:
+        np.savetxt(out_txt, save_info)
+        print(f"\033[1;93m[CM INFO]\033[0m lookup table saved to {out_txt}")
+        return None
+    else:
+        return save_info

@@ -75,32 +75,32 @@ def validate_config(config):
     ## check all top-level keys present
     for key in ("channels", "resonances", "continuum", "paths", "plotting"):
         if key not in config:
-            raise ValueError(f"[CONFIG ERROR] config is missing required top-level key '{key}'")
+            raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m config is missing required top-level key '{key}'")
 
     channels = config["channels"]
     resonances = config["resonances"]
     ## check at least 2 channels
     if len(channels) < 2:
-        raise ValueError("[CONFIG ERROR] need at least two channels (one production, one open-charm)")
+        raise ValueError("\033[1;93m[CONFIG ERROR]\033[0m need at least two channels (one production, one open-charm)")
 
     ## check only 1 production channel
     n_production = sum(1 for c in channels if c.get("role") == "production")
     if n_production != 1:
-        raise ValueError(f"[CONFIG ERROR] exactly one channel must have role: production (found {n_production})")
+        raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m exactly one channel must have role: production (found {n_production})")
 
     ## check coupling group specified for all non-prodution channels
     for c in channels:
         if c.get("role") != "production" and "coupling_group" not in c:
-            raise ValueError(f"[CONFIG ERROR] channel '{c.get('name', '?')}' needs a coupling_group")
+            raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m channel '{c.get('name', '?')}' needs a coupling_group")
 
     ## check at least one resonances
     if len(resonances) < 1:
-        raise ValueError("[CONFIG ERROR] need at least one resonance")
+        raise ValueError("\033[1;93m[CONFIG ERROR]\033[0m need at least one resonance")
 
     ## check each resonances has a mass and list of couplings
     for r in resonances:
         if "label" not in r or "mass" not in r or "couplings" not in r:
-            raise ValueError(f"[CONFIG ERROR] malformed resonance entry: {r}")
+            raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m malformed resonance entry: {r}")
     
     ## check all coupling groups have a channel
     r_cgs = []
@@ -111,7 +111,7 @@ def validate_config(config):
     c_cgs = list(set([c["coupling_group"] for c in channels]))
     for cg in r_cgs:
         if cg not in c_cgs:
-            raise ValueError(f"[CONFIG ERROR] coupling group '{cg}' used in resonances but does not belong to any channel")
+            raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m coupling group '{cg}' used in resonances but does not belong to any channel")
 
     ## check fit range specified
     if config['fit'].get('fit_range') == None:
@@ -121,7 +121,7 @@ def validate_config(config):
         config['fit']['fit_range']['high'] = 10.
     
 
-    print("[CONFIG INFO] passed validation")
+    print("\033[1;93m[CONFIG INFO]\033[0m passed validation")
     print("=" * 64)
 
 

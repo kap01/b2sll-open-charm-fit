@@ -1,38 +1,10 @@
-#!/usr/bin/env python3
-"""
-Generic coupled-channel K-matrix physics.
-
-Implements M(s) = n(s) [1 - K(s) Sigma(s)]^-1 K(s) n(s)  (Eq. 1 of
-arXiv:2312.00619), with:
-
-  - Sigma_k(s): the analytic (Chew-Mandelstam-type) self-energy for each
-    channel. Equal-mass channels use the exact closed form of Eqs. (4)-(7)
-    of that paper. Unequal-mass channels (e.g. D* Dbar) use a standard
-    closed-form generalisation for L=0, and a numerically-evaluated
-    dispersion integral for L=1 (no closed form is implemented here for
-    that case -- see `sigma_numerical_crosscheck`).
-
-  - n_k(s): the Blatt-Weisskopf vertex factor of Eq. (2), applied on the
-    OUTSIDE of the K-matrix bracket as in Eq. (1) -- previously this was
-    folded into the loop function instead and never applied externally.
-    Kept as its own function since Eq. (A.5)'s P-vector construction for
-    b -> s l+ l- reuses the same n(s).
-
-Both the barrier factor and Sigma are now genuinely analytic functions of
-s (built from q^2(s), a rational function of s, rather than from |q^2|),
-which is a prerequisite for eventually continuing the amplitude off the
-real axis (e.g. for a second-sheet pole search) and for the crossed
-P-vector amplitude in the appendix, which needs the same n(s) to be a
-well-defined analytic object, not just a real-axis convenience array.
-
-Still agnostic to the number of channels / resonances -- both are
-inferred from array shapes -- and no channel or parameter names appear
-anywhere in this module.
-"""
+import sys
+PROJECT_ROOT = "/users/sd22284/b2sll_open_charm/repo/Rratio/kmatrix/src/"
+sys.path.insert(0, str(PROJECT_ROOT))
 
 import numpy as np
 from scipy import integrate
-
+from chew_mandelstams import EPSILON, s_threshold, sqrt_func
 
 ## ------------------------------------------------------------------ kinematics
 def Kallen_triangle_function(x, y, z):
@@ -49,10 +21,7 @@ def breakup_q2(s, m1, m2=None):
 
 def breakup_q(q2):
     """Principal-branch analytic continuation of q(s) = sqrt(q^2(s))."""
-    return np.sqrt(q2)
-
-def s_threshold(m1, m2):
-    return (m1+m2)**2
+    return sqrt_func(q2)
 
 def phsp_function(sqrt_s, q):
     rho = np.real(q / (8.0 * np.pi * sqrt_s))
@@ -60,22 +29,27 @@ def phsp_function(sqrt_s, q):
 
 
 ## ---------------------------------------------------------- vertex factors
-def Blatt_Weisskopf_sq(q2, l, z0):
+def Blatt_Weisskopf_sq(z, l):
     """Square of Blatt-Weisskopf form factor. Only L = 0, 1
     are implemented. Can take q2 as input as they are even functions."""
     # q2 = np.asarray(q2, dtype=complex)
-    q2 = np.asarray(q2) ## ensure array
+    z = np.asarray(z) ## ensure array
     if l == 0:
-        return np.ones_like(q2)
+        return np.ones_like(z)
     elif l == 1:
-        return 1.0 / (1.0 + z0**2 * q2)
+        return 1.0 / (1.0 + z)
+    elif l == 2:
+        return 1. / (9. + 3.*z + z**2)
+    elif l == 3:
+        return 1. / (225. + 45.*z + 6*z**2 + z**3)
     else:
-        raise ValueError(f"orbital angular momentum L={l} not implemented (only L=0,1)")
+        raise ValueError(f"orbital angular momentum L={l} not implemented (only L < 3)")
 
 def vertex_factor_sq(q2, l, z0):
     """Square of the vertex factor for a single channel, square of eqn (2)
     and left unrooted as used as squared function later."""
-    Fsq = Blatt_Weisskopf_sq(q2, l, z0)
+    z = z0**2 * q2
+    Fsq = Blatt_Weisskopf_sq(z, l)
     if l == 0: ## save time not raising to the power 0
         return Fsq
     else:
@@ -83,7 +57,7 @@ def vertex_factor_sq(q2, l, z0):
 
 ## keep with above as both useful in later development
 def vertex_factor(vfs):
-    return np.sqrt(vfs) 
+    return sqrt_func(vfs) 
 
 ## ------------------------------------------------------------- Self energy
 def Pi_function_0(s, sth):
@@ -142,7 +116,8 @@ def Chew_Mandelstamm(s, l, q, q2, z0, m1, m2):
             return prefactor*Pi0
         elif l==1:
             Pi1 = Pi_function_1(s, z0, sth)
-            BWsq = Blatt_Weisskopf_sq(q2, l, z0)
+            z = q2 * z0**2
+            BWsq = Blatt_Weisskopf_sq(s, l)
             sTerm = 0.25*(s-sth)*z0**2
             return prefactor * sTerm * (BWsq*Pi0 + Pi1)
     else:
@@ -173,6 +148,7 @@ def precompute_kinematics(sqrt_s, setup):
     AsymChi2.__init__, or once per plotting grid in reporting.py) and
     reuse the result -- never call it inside a per-MIGRAD-iteration cost
     function."""
+    print(f"\033[1;93m[PHYSICS INFO]\033[0m Start calculating the kinematics for {len(sqrt_s)} s-value(s)...")
 
     ## pull these out of setup to make syntax easier
     sqrt_s = np.atleast_1d(sqrt_s).astype(complex)
@@ -180,6 +156,7 @@ def precompute_kinematics(sqrt_s, setup):
     N_s    = s.shape[0]
     N_ch   = setup.N_ch
     z0     = complex(setup.z0)
+    q0     = 1/z0
  
     ## setup arrays to store the set of values for each sqrt_s point and
     ## per each channel with own mass and o.a.m.
@@ -200,6 +177,7 @@ def precompute_kinematics(sqrt_s, setup):
         Sigma[:, k, k]  = Chew_Mandelstamm(s, l, q, q2, z0, m1, m2)  ## diagonal matrix
         del m1, m2, l, q2, q ## variables to be used again next iteration
  
+    print("               ... finished calculation")
     return Kinematics(sqrt_s, s, q2_arr, q_arr, Sigma, n, rho)
 
 
@@ -216,7 +194,7 @@ def build_K(s, bare_masses, g):
     K = np.zeros((s.shape[0], N_ch, N_ch), dtype=float)
     for a in range(n_res):
         denom = bare_masses[a]**2 - s
-        denom = np.where(np.abs(denom) < 1e-7, 1e-7, denom) ## CHECK IS THIS CAUSING THE DISCTY??
+        denom = np.where(np.abs(denom) < EPSILON, EPSILON, denom)
         ga = g[a]
         K += (ga[None, :, None] * ga[None, None, :]) / denom[:, None, None]
     return K

@@ -187,7 +187,7 @@ class KMatrixFit:
                 if lims == "FIXED":
                     m.fixed[name] = True
                 else:
-                    print("[FITTER INFO] ***WARNING***")
+                    print("\033[1;93m[FITTER INFO]\033[0m ***WARNING***")
                     print(f"             unexpected limit value for parameter {name} : {lims}, check config file")
                     print(f"             fixing parameter in fit by default")
                     m.fixed[name] = True
@@ -217,6 +217,7 @@ class KMatrixFit:
 
         best = None ## this variable will store/return the best fit result of the following loop
         for k in range(n_starts):
+            print(f"\033[1;93m[FITTER INFO]\033[0m Minimisation: round {k+1} of {n_starts} jitters")
             init = base_start.copy()
             if k > 0: 
             ## not cross validated but the logic is such that if k>0 self.minuit has
