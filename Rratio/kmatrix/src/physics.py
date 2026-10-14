@@ -117,7 +117,7 @@ def Chew_Mandelstamm(s, l, q, q2, z0, m1, m2):
         elif l==1:
             Pi1 = Pi_function_1(s, z0, sth)
             z = q2 * z0**2
-            BWsq = Blatt_Weisskopf_sq(s, l)
+            BWsq = Blatt_Weisskopf_sq(z, l)
             sTerm = 0.25*(s-sth)*z0**2
             return prefactor * sTerm * (BWsq*Pi0 + Pi1)
     else:
