@@ -189,8 +189,8 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
 
     ax.set_xlim(plot_lo, plot_hi)
     ymin, ymax = ax.get_ylim()
-    ax.set_ylim(ymin, ymin + (ymax - ymin) * 1.18)   ## headroom for the labels below
-    # ax.set_ylim(1.85, 5.2) ## to match prev code
+    # ax.set_ylim(ymin, ymin + (ymax - ymin) * 1.18)   ## headroom for the labels below
+    ax.set_ylim(1.85, 5.4) ## to match prev code
 
     zorder=0
     first_loop=True
@@ -347,8 +347,7 @@ def plot_covariance(m, param_spec, out_pdf=None):
  
     if out_pdf is not None:
         fig.savefig(out_pdf, bbox_inches='tight')
-        print
-        (f"\033[1;93m[REPORT INFO]\033[0m correlation plot saved to {out_pdf}")
+        print(f"\033[1;93m[REPORT INFO]\033[0m correlation plot saved to {out_pdf}")
         return None
     else:
         return fig
@@ -366,7 +365,7 @@ def make_CM_plot(cm_vals, s_vals, m1_val, m2_val, oam_val, channelname, out_pdf=
     # - don't want to set of a warning when we split up the real and imag parts of cm_vals:
     warnings.filterwarnings('ignore', category=np.exceptions.ComplexWarning)
 
-    X = ['S', 'P', 'D', 'F'][oam_val]
+    X = ['S', 'P', 'D', 'F', 'G', 'H', 'K'][oam_val]
     s_thr = s_threshold(m1_val, m2_val)
 
     fig, ax = plt.subplots(figsize=(6, 4))

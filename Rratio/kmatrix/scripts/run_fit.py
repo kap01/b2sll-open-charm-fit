@@ -18,21 +18,24 @@ import sys
 PROJECT_ROOT = "/users/sd22284/b2sll_open_charm/repo/Rratio/kmatrix/src/"
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from loading   import load_config, validate_config, build_channel_setup, load_data
+from loading   import USER_PATH, load_config, validate_config, build_channel_setup, load_data
 from fitting   import build_parameter_spec, KMatrixFit
 from reporting import *
 
 if __name__ == "__main__":
-    user_path = "/users/sd22284/b2sll_open_charm/repo/Rratio/"
-    CONFIG_FILE = user_path + "kmatrix/config/safe_config.yml"
+    CONFIG_FILE = USER_PATH + "kmatrix/config/dev_check_l_dep.yml"
 
     config = load_config(CONFIG_FILE)
-    validate_config(config)
+    try:
+        validate_config(config)
+    except ValueError as e:
+        print(e)
+        sys.exit(1)
 
     setup = build_channel_setup(config)
     param_spec = build_parameter_spec(config, setup)
 
-    rootfiles = [user_path+p for p in config["paths"]["data_path"]]
+    rootfiles = [USER_PATH+p for p in config["paths"]["data_path"]]
     outfolder = config["paths"]["save_path"]
 
     today = datetime.now().strftime("%Y_%m_%d")
@@ -55,7 +58,7 @@ if __name__ == "__main__":
     ## sanity check - is the complex part of R_model = 0?
     R = fitter.evaluate(x)
     if not np.all(R.imag == 0):
-        print("[FITTER INFO] ***WARNING***")
+        print("\033[1;93m[FITTER INFO]\033[0m ***WARNING***")
         print("              check the R_model as it is returning some complex values")
 
     ## save output                       

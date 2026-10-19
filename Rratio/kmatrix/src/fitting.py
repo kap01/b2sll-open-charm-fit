@@ -16,6 +16,7 @@ from iminuit import Minuit
 
 from physics import R_model, precompute_kinematics
 from reporting import limit_warning
+from time import time
 
 ## ------------------------------------------------------------------ parameter bookkeeping
 class ParameterSpec:
@@ -82,7 +83,7 @@ class ParameterSpec:
         return "coupling"
 
 
-def build_parameter_spec(config, setup):
+def build_parameter_spec(config, channel_setup):
     """Build a ParameterSpec from config['resonances'] / config['continuum'],
     resolved against the channel groups in `setup` (a ChannelSetup)."""
     names, start, limits = [], [], []
@@ -116,15 +117,15 @@ def build_parameter_spec(config, setup):
     res_coupling_idx = []
     for gmap in res_group_idx:
         row = []
-        for ch_group in setup.groups:
+        for ch_group in channel_setup.groups:
             if ch_group not in gmap:
                 raise ValueError(f"resonance is missing a coupling for group '{ch_group}'")
             row.append(gmap[ch_group])
         res_coupling_idx.append(row)
 
     continuum_coupling_idx = [
-        -1 if i == setup.production_idx else continuum_group_idx.get(ch_group, -1)
-        for i, ch_group in enumerate(setup.groups)
+        -1 if i == channel_setup.production_idx else continuum_group_idx.get(ch_group, -1)
+        for i, ch_group in enumerate(channel_setup.groups)
     ]
 
     return ParameterSpec(names=names, start=np.array(start, dtype=float), limits=limits,
@@ -144,9 +145,9 @@ class AsymChi2:
         self.setup = channel_setup
         self.kinematics = precompute_kinematics(self.x, channel_setup)
         ## penalty term:
-        self.penalty_sqrt_s  = 9.0                      ## far away from oc threshold
-        self.penalty_r_max   = 3.55                     ## the limit value for the model as R_udsc
-        self.penalty_sigma   = 0.10*self.penalty_r_max  ## % theory uncert on predicted R_udsc * value of R_udsc using
+        self.penalty_sqrt_s  = channel_setup.penalty["s"]
+        self.penalty_r_max   = channel_setup.penalty["R_max"]
+        self.penalty_sigma   = channel_setup.penalty["R_err"]
         self.kinematics_penalty = precompute_kinematics(np.array([self.penalty_sqrt_s]), channel_setup)
 
     def __call__(self, par):
@@ -198,13 +199,6 @@ class KMatrixFit:
             self.minuit = m
         return m
 
-    # def setup(self):
-    #     """Build the Minuit object at the configured starting values and
-    #     apply limits. Does not run the minimisation -- lets you inspect
-    #     e.g. the starting chi2 (self.minuit.fval) before committing to a fit."""
-    #     self.minuit = self.new_minuit(self.param_spec.start)
-    #     return self.minuit
-
     def run(self, n_starts=6, seed=1, jitter=None):
         """Run MIGRAD with n_starts randomised restarts and keep the best
         valid result. setup() must be called first."""
@@ -217,7 +211,7 @@ class KMatrixFit:
 
         best = None ## this variable will store/return the best fit result of the following loop
         for k in range(n_starts):
-            print(f"\033[1;93m[FITTER INFO]\033[0m Minimisation: round {k+1} of {n_starts} jitters")
+            start = time()
             init = base_start.copy()
             if k > 0: 
             ## not cross validated but the logic is such that if k>0 self.minuit has
@@ -245,6 +239,9 @@ class KMatrixFit:
                 continue
             if m.valid and (best is None or m.fval < best.fval):
                 best = m
+            end = time()
+            print(f"\033[1;93m[FITTER INFO]\033[0m Completed minimisation round {k+1} of {n_starts} jitters, took {end-start:1f}s")
+
 
         if best is None:
             raise RuntimeError("no valid fit found in any restart")

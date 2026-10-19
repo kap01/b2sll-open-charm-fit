@@ -52,6 +52,7 @@ unnorm_BlattWeiss = {
     1 : 2,
     2 : 13,
     3 : 277,
+    4 : 12746,
 }
 
 ## ---- WRAP THE AMPFORM FUNCTIONS INTO CLASSES WITH OUR SYMPY SYMBOLS  ---- ##
@@ -259,48 +260,3 @@ def Chew_Mandelstamm(s_vals, m1_val, m2_val, oam_val, q0_val=1.0, epsilon_val=EP
     ## otherwise return the integral form
     else:
         return CMfunc_general_integral(s_vals, m1_val, m2_val, oam_val, q0_val, epsilon_val)
-
-
-# ## ---- SAVING ---- ##
-# real_style = {"label": "Real part", "c": "deeppink"}
-# imag_style = {"label": "Imag part", "c": "forestgreen", "linestyle": "-."}
-# threshold_style = {"label": R"$s_\mathrm{thr}$", "c": "deepskyblue", "linewidth": 0.9, "linestyle":"dotted"}
-
-# def make_CM_plot(cm_vals, s_vals, m1_val, m2_val, oam_val, channelname, out_pdf=None):
-#     # - don't want to set of a warning when we split up the real and imag parts of cm_vals:
-#     warnings.filterwarnings('ignore', category=np.exceptions.ComplexWarning)
-
-#     X = ['S', 'P', 'D', 'F'][oam_val]
-#     s_thr = s_threshold(m1_val, m2_val)
-
-#     fig, ax = plt.subplots(figsize=(6, 4))
-#     # - x axis
-#     ax.axhline(0, color="black", linewidth=0.75)
-#     # - mark the s_threshold
-#     ax.axvline(s_thr, **threshold_style)
-#     # - plot the components
-#     ax.plot(s_vals, cm_vals.real, alpha=0.7, **real_style)
-#     ax.plot(s_vals, cm_vals.imag, alpha=0.7, **imag_style)
-
-#     # - graphics:
-#     ax.legend()
-#     ax.set_xlim(np.min(s_vals), np.max(s_vals))
-#     ax.set_xlabel(r"$s$ [GeV$^2$]", loc='right')
-#     ax.set_ylabel(r"$\Sigma(s)$", rotation=90, fontsize=20) ##text renders smaller
-#     ax.set_title(f"Chew Mandelstam function for {channelname} {X}-wave:\n$L={oam_val}$, $m_1={m1_val:.2f}$, $m_2={m2_val:.2f}$", fontsize=17)
-
-#     if out_pdf is not None:
-#         fig.savefig(out_pdf, bbox_inches='tight')
-#         print(f"\033[1;93m[CM INFO]\033[0m plot saved to {out_pdf}")
-#         return None
-#     else:
-#         return fig
-
-# def save_lookup_table(cm_vals, s_vals, out_txt=None):
-#     save_info = np.vstack([cm_vals, s_vals])
-#     if out_txt is not None:
-#         np.savetxt(out_txt, save_info)
-#         print(f"\033[1;93m[CM INFO]\033[0m lookup table saved to {out_txt}")
-#         return None
-#     else:
-#         return save_info

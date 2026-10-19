@@ -3,8 +3,8 @@ PROJECT_ROOT = "/users/sd22284/b2sll_open_charm/repo/Rratio/kmatrix/src/"
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import numpy as np
-from scipy import integrate
 from chew_mandelstams import EPSILON, s_threshold, sqrt_func
+from loading import load_cm_vals, build_cm_filename
 
 ## ------------------------------------------------------------------ kinematics
 def Kallen_triangle_function(x, y, z):
@@ -37,18 +37,18 @@ def Blatt_Weisskopf_sq(z, l):
     if l == 0:
         return np.ones_like(z)
     elif l == 1:
-        return 1.0 / (1.0 + z)
+        return 1.0 / (1.0 + z**2)
     elif l == 2:
-        return 1. / (9. + 3.*z + z**2)
+        return 1. / (9. + 3.* z**2 + z**4)
     elif l == 3:
-        return 1. / (225. + 45.*z + 6*z**2 + z**3)
+        return 1. / (225. + 45.* z**2 + 6.* z**4 + z**6)
     else:
         raise ValueError(f"orbital angular momentum L={l} not implemented (only L < 3)")
 
-def vertex_factor_sq(q2, l, z0):
+def vertex_factor_sq(q, q2, l, z0):
     """Square of the vertex factor for a single channel, square of eqn (2)
     and left unrooted as used as squared function later."""
-    z = z0**2 * q2
+    z = q * z0
     Fsq = Blatt_Weisskopf_sq(z, l)
     if l == 0: ## save time not raising to the power 0
         return Fsq
@@ -66,9 +66,11 @@ def Pi_function_0(s, sth):
     between the Riemann sheets)
     Manually change the sign of the imag part to compensate for numpy.sqrt 
     approaching the pole from the wrong direction"""
-    arg = np.sqrt(s/(sth - s))
-    wrongsign =  -1./arg * np.arctan(arg)
-    return wrongsign.real - wrongsign.imag * 1j
+    # arg = np.sqrt(s/(sth - s))
+    # wrongsign =  -1./arg * np.arctan(arg)
+    # return wrongsign.real - wrongsign.imag * 1j
+    arg = sqrt_func(s/(sth - s))
+    return -1./arg * np.arctan(arg)
 
 
 def Pi_function_1(s, z0, sth):
@@ -78,13 +80,14 @@ def Pi_function_1(s, z0, sth):
     Manually change the sign *if* a pole exists (even though it cancels) to
     compensate for numpy.sqrt giving wrong root"""
     s0 = 4 / (z0**2)
-    if s0 < sth:
-        sign = -1
-    else:
-        sign = 1
-    term1 = (s0**1.5) / (np.sqrt(s0-sth) * (s + s0 - sth))
-    term2 = np.sqrt(1-sth/s0)
-    return term1 * np.arctanh(term2) * sign
+    # if s0 < sth:
+    #     sign = -1
+    # else:
+    #     sign = 1
+    # term1 = (s0**1.5) / (np.sqrt(s0-sth) * (s + s0 - sth))
+    term1 = (s0**1.5) / (sqrt_func(s0-sth) * (s + s0 - sth))
+    term2 = sqrt_func(1-sth/s0)
+    return term1 * np.arctanh(term2) ##* sign
 
 def Swave_Chew_Mandelstamm(s, sth, m1, m2, q):
     """Chew-Mandelstam self-energy for an S-wave (L=0) channel with unequal
@@ -107,24 +110,34 @@ def Swave_Chew_Mandelstamm(s, sth, m1, m2, q):
 
 
 
-def Chew_Mandelstamm(s, l, q, q2, z0, m1, m2):
-    prefactor = 1/(8*np.pi**2)
-    sth = s_threshold(m1, m2)
-    if np.isclose(m1, m2):
-        Pi0 = Pi_function_0(s, sth)
-        if l == 0:
-            return prefactor*Pi0
-        elif l==1:
-            Pi1 = Pi_function_1(s, z0, sth)
-            z = q2 * z0**2
-            BWsq = Blatt_Weisskopf_sq(z, l)
-            sTerm = 0.25*(s-sth)*z0**2
-            return prefactor * sTerm * (BWsq*Pi0 + Pi1)
-    else:
-        if l == 0:
-            return Swave_Chew_Mandelstamm(s, sth, m1, m2, q)
-        else:
-            raise ValueError(f"orbital angular momentum L={l} not implemented (only L=0) for inequal masses")
+# def Chew_Mandelstamm(s, l, q, z0, m1, m2):
+#     prefactor = 1/(8*np.pi**2)
+#     sth = s_threshold(m1, m2)
+#     if np.isclose(m1, m2):
+#         Pi0 = Pi_function_0(s, sth)
+#         if l == 0:
+#             return prefactor*Pi0
+#         elif l==1:
+#             Pi1 = Pi_function_1(s, z0, sth)
+#             z = q * z0
+#             BWsq = Blatt_Weisskopf_sq(z, l)
+#             sTerm = 0.25*(s-sth)*z0**2
+#             return prefactor * sTerm * (BWsq*Pi0 + Pi1)
+#     else:
+#         if l == 0:
+#             return Swave_Chew_Mandelstamm(s, sth, m1, m2, q)
+#         else:
+#             # raise ValueError(f"orbital angular momentum L={l} not implemented (only L=0) for inequal masses")
+#             return np.ones_like(s)
+
+def Chew_Mandelstamm(s, channel_setup, channel_idx):
+    # filename = build_cm_filename(name, z0)
+    # lookup_table = np.loadtxt(filename, dtype=complex)
+    # ref_s = np.sqrt(lookup_table[1].real)
+    ref_s, ref_cm = load_cm_vals(channel_setup, channel_idx)
+    closest_idx = (np.abs(s.real[..., None]-ref_s)).argmin(axis=-1)
+    cm_vals = ref_cm[closest_idx]
+    return cm_vals
 
 ## ------------------------------------------------------------- save kinematics
 class Kinematics:
@@ -157,6 +170,7 @@ def precompute_kinematics(sqrt_s, setup):
     N_ch   = setup.N_ch
     z0     = complex(setup.z0)
     q0     = 1/z0
+    print(f"\033[1;93m[PHYSICS INFO]\033[0m Will be loading CM functions from ref files of the form: \n               "+ build_cm_filename(setup, -1))
  
     ## setup arrays to store the set of values for each sqrt_s point and
     ## per each channel with own mass and o.a.m.
@@ -173,8 +187,9 @@ def precompute_kinematics(sqrt_s, setup):
         q2_arr[:, k]    = q2
         q_arr[:, k]     = q
         rho[:, k]       = phsp_function(sqrt_s, q)
-        n[:, k, k]      = vertex_factor(vertex_factor_sq(q2, l, z0)) ## diagonal matrix
-        Sigma[:, k, k]  = Chew_Mandelstamm(s, l, q, q2, z0, m1, m2)  ## diagonal matrix
+        n[:, k, k]      = vertex_factor(vertex_factor_sq(q, q2, l, z0)) ## diagonal matrix
+        # Sigma[:, k, k]  = Chew_Mandelstamm(s, l, q, z0, m1, m2)  ## diagonal matrix
+        Sigma[:, k, k]  = Chew_Mandelstamm(s, setup, k)  ## diagonal matrix
         del m1, m2, l, q2, q ## variables to be used again next iteration
  
     print("               ... finished calculation")

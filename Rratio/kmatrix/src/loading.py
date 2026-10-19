@@ -15,6 +15,11 @@ is supported without touching this module or physics.py.
 import numpy as np
 import uproot
 from yaml import safe_load
+from os import makedirs, listdir
+from os.path import exists
+
+USER_PATH = "/users/sd22284/b2sll_open_charm/repo/Rratio/"
+
 
 class ChannelSetup:
     """Everything the physics functions need to know about the channels.
@@ -25,11 +30,11 @@ class ChannelSetup:
     any field raises AttributeError, so a physics function can't silently
     mutate shared setup state that every other caller also depends on."""
 
-    _fields = ("names", "masses", "oam", "groups", "tex",
-               "production_idx", "open_charm_idxs", "z0")
+    _fields = ("names", "masses", "oam", "groups", "tex", "production_idx",
+               "open_charm_idxs", "z0", "penalty", "latest_CMs")
 
     def __init__(self, names, masses, masses2, oam, groups, tex,
-                 production_idx, open_charm_idxs, z0):
+                 production_idx, open_charm_idxs, z0, penalty, latest_CMs):
         self.__dict__["names"] = names                         # channel names, index-aligned; for reporting/plotting only
         self.__dict__["masses"] = masses                       # (N_ch,) threshold mass of one leg of each channel - this first particle
         self.__dict__["masses2"] = masses2                     # (N_ch,) threshold mass of one leg of each channel - the second particle
@@ -39,6 +44,8 @@ class ChannelSetup:
         self.__dict__["production_idx"] = production_idx       # index of the channel the photon couples to
         self.__dict__["open_charm_idxs"] = open_charm_idxs     # indices of channels summed over in R
         self.__dict__["z0"] = z0                               # Blatt-Weisskopf radius parameter
+        self.__dict__["penalty"] = penalty                     # Constants for the penalty term
+        self.__dict__["latest_CMs"] = latest_CMs               # Store CM path here so can be used with build_CM_filename
 
     def __setattr__(self, name, value):
         raise AttributeError(
@@ -76,6 +83,10 @@ def validate_config(config):
     for key in ("channels", "resonances", "continuum", "paths", "plotting"):
         if key not in config:
             raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m config is missing required top-level key '{key}'")
+
+    ## check CM paths present
+    if "CM_path" not in config["paths"]:
+        raise ValueError("\033[1;93m[CONFIG WARNING]\033[0m No path for Chew Mandelstam lookup table specified")
 
     channels = config["channels"]
     resonances = config["resonances"]
@@ -144,17 +155,23 @@ def build_channel_setup(config):
 
     open_charm_idxs = tuple(i for i, c in enumerate(channels_cfg) if c.get("open_charm", False))
 
-    const = config.get("constants", {})
-    if "z0" in const:
-        z0 = const["z0"]
-    elif "q0" in const:
-        z0 = 1.0 / const["q0"]
+    constants = config.get("constants", {})
+    if "z0" in constants:
+        z0 = constants["z0"]
+    elif "q0" in constants:
+        z0 = 1.0 / constants["q0"]
     else:
         z0 = 3.0
 
-    return ChannelSetup(names=names, masses=masses, masses2=masses2, oam=oam, groups=groups, tex=tex,
-                         production_idx=production_idx,
-                         open_charm_idxs=open_charm_idxs, z0=z0)
+    penalty = {}
+    for c in constants:
+        if "penalty_" in c:
+            penalty[c.replace("penalty_", "")] = constants[c]
+
+    latest_CMs = config["paths"]["CM_path"]
+
+    return ChannelSetup(names=names, masses=masses, masses2=masses2, oam=oam, groups=groups, tex=tex, production_idx=production_idx,
+                        open_charm_idxs=open_charm_idxs, z0=z0, penalty=penalty, latest_CMs=latest_CMs)
 
 
 def load_data(paths, fit_range, return_id=False):
@@ -182,3 +199,35 @@ def load_data(paths, fit_range, return_id=False):
         return x, y, eyl, eyh
     else:
         return x, y, eyl, eyh, ids
+
+def build_cm_filename(setup, channel_idx, user_path=USER_PATH):
+    return user_path + setup.latest_CMs +f"chew_mands__z0_{setup.z0}__l_{setup.oam[channel_idx]}__{setup.names[channel_idx]}.txt"
+
+def validate_cm_file(setup, user_path=USER_PATH):
+    outfolder_txt = build_cm_filename(setup, 0, user_path).split("chew_mands")[0]
+    if exists(outfolder_txt):
+        existing_CMs = listdir(outfolder_txt)
+        for i in range(setup.N_ch):
+            filename = build_cm_filename(setup, i, USER_PATH).replace(outfolder_txt, "")
+            if filename in existing_CMs:
+                raise FileExistsError(f"""\033[1;93m[SETUP ERROR]\033[0m CM lookup table for \033[0;93m{setup.names[i]}\033[0m already exists in
+                               \033[0;93m{outfolder_txt}\033[0m
+                               will not overwrite, remove file, or channel from config""")
+        print(f"\033[1;93m[SETUP INFO]\033[0m CM folder at \033[0;93m{outfolder_txt}\033[0m exists,")
+        print("             but none of channels in config are present, will calculate all")
+    else:
+        print("\033[1;93m[SETUP INFO]\033[0m Making newfolder for CMs, all will be calculated")
+        makedirs(outfolder_txt)
+    return
+
+def load_cm_vals(setup, channel_idx, user_path=USER_PATH):
+    filename = build_cm_filename(setup, channel_idx, user_path)
+    try:
+        lookup_table = np.loadtxt(filename, dtype=complex)
+    except:
+        raise IOError(f"""\033[1;93m[CM ERROR]\033[0m Couldn't read CM lookup table at
+\n\033[0;93m{filename}\033[0m,\n
+                check you have run plot_CM_functions?""") from None
+
+    ref_s = np.sqrt(lookup_table[1].real)
+    return ref_s, lookup_table[0]
