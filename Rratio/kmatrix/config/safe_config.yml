@@ -12,23 +12,29 @@ paths:
   data_path: 
      - "data/BES2002/ins552757-v1.root"
      - "data/BESII2006A/table_2.root"
-  save_path: "z0_is_1"
+  save_path: "cm_excited_l"
+  CM_path: "kmatrix/includes/2026_10_19/"
 
 constants:
   z0: 1       # Blatt-Weisskopf radius; alternatively give q0 (z0 = 1/q0)
+  penalty_s: 9.0        ## far away from oc threshold
+  penalty_R_max: 3.55   ## the limit value for the model as R_udsc
+  penalty_R_err: 0.36   ## theory uncert on predicted R_udsc * value of R_udsc using
 
 plotting:
   limits:
     low: 3.55
     high: 4.85
   group_tex:
-    ee      : '$e^{+}e^{-}$'
-    DD      : '$D\overline{D}$'
-    DstDst  : '$D^{*}\overline{D}^{*}$'
-    DsDs    : '$D_{s}\overline{D}_{s}$'
-    DstD    : '$D^{*}\overline{D}$'
-    DstDs   : '$D^{*}_{s}\overline{D}_{s}$'
-    DstDsts : '$D^{*}_{s}\overline{D}^{*}_{s}$'
+    ee       : '$e^{+}e^{-}$'
+    DD       : '$D\overline{D}$'
+    DstDst   : '$D^{*}\overline{D}^{*}$'
+    DsDs     : '$D_{s}\overline{D}_{s}$'
+    DstD     : '$D^{*}\overline{D}$'
+    DstDs    : '$D^{*}_{s}\overline{D}_{s}$'
+    DstsDsts : '$D^{*}_{s}\overline{D}^{*}_{s}$'
+    D1D      : '$D_{1}(2420)D$'
+    D2D      : '$D_{2}(2460)D$'
   source_tex:
      - "BES 2002"
      - "BESII 2006A"
@@ -101,7 +107,7 @@ channels:
   - name: Dst0Dst0
     mass : 2.00685
     mass2: 2.00685
-    oam: 1
+    oam: 3
     coupling_group: DstDst
     open_charm: true
     tex: '$D^{*0}\overline{D}^{*0}$'
@@ -109,7 +115,7 @@ channels:
   - name: DstpDstm
     mass : 2.01026
     mass2: 2.01026
-    oam: 1
+    oam: 3
     coupling_group: DstDst
     open_charm: true
     tex: '$D^{*+}D^{*-}$'
@@ -122,13 +128,45 @@ channels:
     open_charm: true
     tex: '$D^{*}_{s}\overline{D}_{s}$'
 
-  - name: DstDsts
+  - name: DstsDsts
     mass : 2.1122
     mass2: 2.1122
     oam: 1
-    coupling_group: DstDsts
+    coupling_group: DstsDsts
     open_charm: true
     tex: '$D^{*}_{s}\overline{D}^{*}_{s}$'
+
+  - name: D1D0 
+    mass : 2.4221
+    mass2: 1.86484
+    oam: 0
+    coupling_group: D1D
+    open_charm: true
+    tex: '$D^{0}_{1}(2420)\overline{D}^{0}$'
+  
+  - name: D1Dpm
+    mass : 2.426
+    mass2: 1.86966
+    oam: 0
+    coupling_group: D1D
+    open_charm: true
+    tex: '$D^{+}_{1}(2420)D^{-}$'
+  
+  - name: D2stD0
+    mass : 2.4611
+    mass2: 1.86484
+    oam: 2
+    coupling_group: D2D
+    open_charm: true
+    tex: '$D^{*0}_{2}(2460)\overline{D}^{0}$'
+  
+  - name: D2stDpm
+    mass : 2.4635
+    mass2: 1.86966
+    oam: 2
+    coupling_group: D2D
+    open_charm: true
+    tex: '$D^{*+}_{2}(2460)D^{-}$'
 
 # ---- resonances ---------------------------------------------------------
 # `label` is used to build parameter names: M_<label>, g_<label>_<group>.
@@ -146,7 +184,9 @@ resonances:
       DstDst: {start: 0.10, limits: [-8.0, 8.0]}
       DstD: {start: 0.10, limits: [-8.0, 8.0]}
       DstDs: {start: 0.10, limits: [-8.0, 8.0]}
-      # DstDsts: {start: 0.0, limits: [-8.0, 8.0]}
+      DstsDsts: {start: 0.0, limits: [-8.0, 8.0]}
+      D1D: {start: 0.0, limits: [-8.0, 8.0]}
+      D2D: {start: 0.0, limits: [-8.0, 8.0]}
 
   - label: "2"
     mass:
@@ -159,7 +199,9 @@ resonances:
       DstDst: {start: 0.60, limits: [-8.0, 8.0]}
       DstD: {start: 0.10, limits: [-8.0, 8.0]}
       DstDs: {start: 0.10, limits: [-8.0, 8.0]}
-      # DstDsts: {start: 0.0, limits: [-8.0, 8.0]}
+      DstsDsts: {start: 0.0, limits: [-8.0, 8.0]}
+      D1D: {start: 0.0, limits: [-8.0, 8.0]}
+      D2D: {start: 0.0, limits: [-8.0, 8.0]}
 
   - label: "3"
     mass:
@@ -172,7 +214,10 @@ resonances:
       DstDst: {start: 0.60, limits: [-8.0, 8.0]}
       DstD: {start: 0.10, limits: [-8.0, 8.0]}
       DstDs: {start: 0.10, limits: [-8.0, 8.0]}
-      # DstDsts: {start: 0.0, limits: [-8.0, 8.0]}
+      DstsDsts: {start: 0.0, limits: [-8.0, 8.0]}
+      D1D: {start: 0.0, limits: [-8.0, 8.0]}
+      D2D: {start: 0.0, limits: [-8.0, 8.0]}
+
       
   - label: "4" ## looks like psi(4415)
     mass:
@@ -185,7 +230,10 @@ resonances:
       DstDst: {start: 0.60, limits: [-8.0, 8.0]}
       DstD: {start: 0.10, limits: [-8.0, 8.0]}
       DstDs: {start: 0.10, limits: [-8.0, 8.0]}
-      # DstDsts: {start: 0.0, limits: [-8.0, 8.0]}
+      DstsDsts: {start: 0.0, limits: [-8.0, 8.0]}
+      D1D: {start: 0.0, limits: [-8.0, 8.0]}
+      D2D: {start: 0.0, limits: [-8.0, 8.0]}
+
       
 # ---- non-resonant continuum ---------------------------------------------
 # baseline: the flat R_uds light-quark contribution
@@ -202,4 +250,6 @@ continuum:
     DstDst: {start: 0.3, limits: [-4.0, 4.0]}
     DstD: {start: 0.10, limits: [-8.0, 8.0]}
     DstDs: {start: 0.10, limits: [-8.0, 8.0]}
-    # DstDsts: {start: 0.0, limits: [-8.0, 8.0]}
+    DstsDsts: {start: 0.0, limits: [-8.0, 8.0]}
+    D1D: {start: 0.0, limits: [-8.0, 8.0]}
+    D2D: {start: 0.0, limits: [-8.0, 8.0]}
