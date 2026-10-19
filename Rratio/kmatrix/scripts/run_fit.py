@@ -48,7 +48,6 @@ if __name__ == "__main__":
     ## setup fitter
     fit_cfg = config.get("fit", {})
     fitter = KMatrixFit(data, param_spec, setup)
-    # fitter.setup()                                  ## build Minuit object, apply limits
 
     ## run the fit!
     best = fitter.run(n_starts=fit_cfg.get("n_starts", 6),   ## execute the multi-start MIGRAD loop

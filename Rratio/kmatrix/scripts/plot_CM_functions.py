@@ -17,7 +17,7 @@ from loading import load_config, build_channel_setup, build_cm_filename, validat
 
 if __name__ == "__main__":
 
-    CONFIG_FILE = USER_PATH + "kmatrix/config/dev_check_l_dep.yml"
+    CONFIG_FILE = USER_PATH + "kmatrix/config/temp_redo_Pwaves.yml"
 
     config = load_config(CONFIG_FILE)
 
