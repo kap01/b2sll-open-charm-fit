@@ -2,7 +2,7 @@ import numpy as np
 from iminuit import Minuit
 
 from physics import R_model, precompute_kinematics
-from reporting import limit_warning
+from reporting import limit_warning, dict_fit_status
 from time import time
 
 ## ------------------------------------------------------------------ parameter bookkeeping
@@ -166,6 +166,7 @@ class KMatrixFit:
         self.channel_setup = channel_setup
         self.cost = AsymChi2(self.x, self.y, self.eyl, self.eyh, param_spec, channel_setup)
         self.minuit = None
+        self.status = None
 
     def new_minuit(self, start=None):
         start = self.param_spec.start if start is None else start
@@ -224,16 +225,29 @@ class KMatrixFit:
             except Exception as e:
                 print("[FIT INFO] Exception during migrad:\n", repr(e))
                 continue
+                
             if m.valid and (best is None or m.fval < best.fval):
                 best = m
             end = time()
             print(f"\033[1;93m[FITTER INFO]\033[0m Completed minimisation round {k+1} of {n_starts} jitters, took {end-start:1f}s")
 
-
         if best is None:
+            self.status = 4
             raise RuntimeError("no valid fit found in any restart")
+
+        ## more strict validation (have already check it is valid in the above loop)
         best.hesse()
-        self.minuit = best ## overwrite the initial minuit with the best one
+        if not(best.fmin.has_posdef_covar) or  best.fmin.has_made_posdef_covar or best.fmin.hesse_failed:
+            print(f"\033[1;93m[FITTER WARNING]\033[0m Best fit reported has an issue, check below:")
+            print("                 Hesse() failed:                            ", best.fmin.hesse_failed)
+            print("                 Accurate + positive definite covariance:   ", best.fmin.has_posdef_covar)
+            print("                 Covariance forced to be positive definite: ", best.fmin.has_made_posdef_covar)
+            self.status = 3 if best.fmin.hesse_failed else 2 if not(best.fmin.has_posdef_covar) else 1 if best.fmin.has_made_posdef_covar else None
+        else:
+            print("\033[1;93m[FITTER INFO]\033[0m Fit is valid and covariance is positive definite and accurate")
+            self.status = 0
+
+        self.minuit = best ## overwrite the initial minuit with the best one in either case
         return best
 
     def evaluate(self, sqrt_s):

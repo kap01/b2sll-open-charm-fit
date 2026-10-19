@@ -27,6 +27,14 @@ colourList = ["mediumvioletred", "#FF3EB7", "orchid", "whitesmoke", "#8AD291", "
 my_cmap = LinearSegmentedColormap.from_list('my_cmap', colourList)
 
 ###### ------- FITTING ------- #######
+dict_fit_status = {
+    0 : "Fit is valid with positive definite + accurate covariance",
+    1 : "Fit is valid but covariance forced to be positive definite",
+    2 : "Fit is valid but covariance not postive definite",
+    3 : "Fit is valid but Hesse() failed",
+    4 : "No valid minima found",
+    None: "***ERROR IN FIT VALIDATION***" ## should be unreachable
+}
 
 def limit_warning(m, param_spec):
     """Warn if any of the fit parameters have hit their limits when
@@ -101,12 +109,12 @@ def save_conditions(param_spec, setup, limits, out_txt=None):
     else:
         print(text)
 
-def report(m, param_spec, data, out_txt=None):
+def report(m, fit_status, param_spec, data, out_txt=None):
     x = data[0]
     ndf = len(x) - m.nfit
     lines = [
         "=" * 66,
-        f" MIGRAD valid : {m.valid}     accurate covariance : {m.accurate}",
+        f" Fit status   : {fit_status}    - {dict_fit_status[fit_status]}",
         f" chi2         : {m.fval:.2f}",
         f" ndf          : {ndf}   (N = {len(x)}, free params = {m.nfit})",
         f" chi2 / ndf   : {m.fval/ndf:.3f}",

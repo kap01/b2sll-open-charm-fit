@@ -23,7 +23,7 @@ from fitting   import build_parameter_spec, KMatrixFit
 from reporting import *
 
 if __name__ == "__main__":
-    CONFIG_FILE = USER_PATH + "kmatrix/config/dev_check_l_dep.yml"
+    CONFIG_FILE = USER_PATH + "kmatrix/config/safe_config.yml"
 
     config = load_config(CONFIG_FILE)
     try:
@@ -57,12 +57,12 @@ if __name__ == "__main__":
     ## sanity check - is the complex part of R_model = 0?
     R = fitter.evaluate(x)
     if not np.all(R.imag == 0):
-        print("\033[1;93m[FITTER INFO]\033[0m ***WARNING***")
+        print("\033[1;93m[FITTER WARNING]\033[0m ***WARNING***")
         print("              check the R_model as it is returning some complex values")
 
     ## save output                       
     save_conditions(param_spec, setup,  config['fit']['fit_range'], out_txt=f"{today}/{outfolder}/fit_conditions.txt")
-    report(best, param_spec, data, out_txt=f"{today}/{outfolder}/fit_result.txt")
+    report(best, fitter.status, param_spec, data, out_txt=f"{today}/{outfolder}/fit_result.txt")
     limit_warning(best, param_spec) ## after the above function as report is a big chunk of text in the terminal
     make_plot(best, param_spec, setup, data, config["plotting"], source_ids, out_pdf=f"{today}/{outfolder}/fit_result.pdf")
     couplings_plot(best, param_spec, setup, config['plotting'], out_pdf=f"{today}/{outfolder}/couplings.pdf")
