@@ -251,8 +251,7 @@ def Chew_Mandelstamm(s_vals, m1_val, m2_val, oam_val, q0_val=1.0, epsilon_val=EP
     elif np.isclose(m1_val, m2_val, 0.000001) and oam_val==0:
         return CMfunc_S_wave_equalmass(s_vals, m1_val, epsilon_val)
     ## use analytical form for same mass and P wave as exists
-    # elif np.isclose(m1_val, m2_val, 0.000001) and oam_val==1:
-    elif oam_val==1:
+    elif np.isclose(m1_val, m2_val, 0.000001) and oam_val==1:
         return CMfunc_P_wave_equalmass(s_vals, m1_val, q0_val, epsilon_val)
     ## use analytical form for different mass and S wave as exists
     elif oam_val == 0:

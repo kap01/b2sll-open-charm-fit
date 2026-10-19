@@ -1,17 +1,3 @@
-#!/usr/bin/env python3
-"""
-Config loading/validation and data loading.
-
-The config schema (see example_config.yml) is deliberately explicit about
-the difference between a parameter's *starting value* and its *limits* --
-every place a number is given for fitting, it is given as
-    {start: <value>, limits: [<lo>, <hi>]}
-so there is never ambiguity about which is which.
-
-Channels and resonances are both open-ended lists, so any number of each
-is supported without touching this module or physics.py.
-"""
-
 import numpy as np
 import uproot
 from yaml import safe_load

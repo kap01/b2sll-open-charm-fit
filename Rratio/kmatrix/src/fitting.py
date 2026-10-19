@@ -1,16 +1,3 @@
-#!/usr/bin/env python3
-"""
-Fit machinery: turning the config's named resonances/couplings into a flat
-parameter vector Minuit can work with, the asymmetric chi2 cost function,
-and a KMatrixFit class that separates *setting up* the fit (starting
-values, limits, building the Minuit object) from *running* it (the
-multi-start MIGRAD loop).
-
-No parameter names are hardcoded anywhere: they are all generated from the
-config (resonance labels and coupling-group names), and the physics module
-(physics.py) never sees names at all -- only the plain arrays that
-ParameterSpec.unpack() produces.
-"""
 import numpy as np
 from iminuit import Minuit
 
