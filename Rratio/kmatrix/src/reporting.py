@@ -121,7 +121,10 @@ def report(m, fit_status, param_spec, data, out_txt=None):
         "-" * 66,
     ]
     for name in param_spec.names:
-        lines.append(f"   {name:14s} = {m.values[name]:+9.4f}  +/- {m.errors[name]:.4f}")
+        if m.fixed[name]: ## don't report a meaningless error on a fixed parameter
+            lines.append(f"   {name:14s} = {m.values[name]:+9.4f}      ------")
+        else:
+            lines.append(f"   {name:14s} = {m.values[name]:+9.4f}  +/- {m.errors[name]:.4f}")
     lines.append("=" * 66)
 
     text = "\n".join(lines)

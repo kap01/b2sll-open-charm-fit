@@ -187,7 +187,11 @@ def load_data(paths, fit_range, return_id=False):
         return x, y, eyl, eyh, ids
 
 def build_cm_filename(setup, channel_idx, user_path=USER_PATH):
-    return user_path + setup.latest_CMs +f"chew_mands__z0_{setup.z0}__l_{setup.oam[channel_idx]}__{setup.names[channel_idx]}.txt"
+    if "eff_psi" in setup.names[channel_idx]: ## hardcoding that eff_psi_2S and eff_psi_3770 use the same CM function
+        use_name = "eff_psi"
+    else:
+        use_name = setup.names[channel_idx]
+    return user_path + setup.latest_CMs +f"chew_mands__z0_{setup.z0}__l_{setup.oam[channel_idx]}__{use_name}.txt"
 
 def validate_cm_file(setup, user_path=USER_PATH):
     outfolder_txt = build_cm_filename(setup, 0, user_path).split("chew_mands")[0]
@@ -213,7 +217,7 @@ def load_cm_vals(setup, channel_idx, user_path=USER_PATH):
     except:
         raise IOError(f"""\033[1;93m[CM ERROR]\033[0m Couldn't read CM lookup table at
 \n\033[0;93m{filename}\033[0m,\n
-                check you have run plot_CM_functions?""") from None
+                    check you have run plot_CM_functions?""") from None
 
     ref_s = np.sqrt(lookup_table[1].real)
     return ref_s, lookup_table[0]
