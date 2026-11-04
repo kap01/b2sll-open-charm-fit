@@ -1,10 +1,14 @@
 # -----------------------------------------------------------------------
-# Example config for the generalised K-matrix fit. Reproduces the original
-# 4-channel / 3-resonance setup, but any number of channels or resonances
-# can be added just by extending the lists below -- no code changes needed.
+# Example config for the generalised K-matrix fit.
+#
+# Channels specified first, resonances after, then background terms
+# 
+# Note that channels =/= coupling group with 'group_tex' so that channels
+# can share coupling constant like with D+D- and D0Dbar0. Resonances 
+# couple to coupling groups, not channels.
 #
 # Every fitted quantity is given as {start: <value>, limits: [<lo>, <hi>]}
-# so starting value and bounds are never ambiguous.
+# and set limits to "FIXED" to fix a parameter
 # -----------------------------------------------------------------------
 
 paths:
@@ -12,7 +16,7 @@ paths:
   data_path: 
      - "data/BES2002/ins552757-v1.root"
      - "data/BESII2006A/table_2.root"
-  save_path: "cm_excited_l"
+  save_path: "ee_coupling_positive__groundstates"
   CM_path: "kmatrix/includes/2026_10_19/"
 
 constants:
@@ -35,6 +39,7 @@ plotting:
     DstsDsts : '$D^{*}_{s}\overline{D}^{*}_{s}$'
     D1D      : '$D_{1}(2420)D$'
     D2D      : '$D_{2}(2460)D$'
+    eff_psi_2S   : '$\mathrm{eff}_{\psi(2S)}$'
   source_tex:
      - "BES 2002"
      - "BESII 2006A"
@@ -63,6 +68,14 @@ channels:
     role: production
     tex : '$e^{+}e^{-}$'
     coupling_group: ee
+
+  - name: eff_psi_2S
+    mass : 0.135
+    mass2: 0.135
+    oam: 1
+    coupling_group: eff_psi_2S
+    open_charm: true
+    tex : '$\mathrm{eff}_{\psi(2S)}$'
 
   - name: D0D0bar
     mass : 1.86484
@@ -107,7 +120,7 @@ channels:
   - name: Dst0Dst0
     mass : 2.00685
     mass2: 2.00685
-    oam: 3
+    oam: 1 ## 3
     coupling_group: DstDst
     open_charm: true
     tex: '$D^{*0}\overline{D}^{*0}$'
@@ -115,7 +128,7 @@ channels:
   - name: DstpDstm
     mass : 2.01026
     mass2: 2.01026
-    oam: 3
+    oam: 1 ## 3
     coupling_group: DstDst
     open_charm: true
     tex: '$D^{*+}D^{*-}$'
@@ -131,7 +144,7 @@ channels:
   - name: DstsDsts
     mass : 2.1122
     mass2: 2.1122
-    oam: 1
+    oam: 1 ## 3
     coupling_group: DstsDsts
     open_charm: true
     tex: '$D^{*}_{s}\overline{D}^{*}_{s}$'
@@ -139,7 +152,7 @@ channels:
   - name: D1D0 
     mass : 2.4221
     mass2: 1.86484
-    oam: 0
+    oam: 0 ## 2
     coupling_group: D1D
     open_charm: true
     tex: '$D^{0}_{1}(2420)\overline{D}^{0}$'
@@ -147,7 +160,7 @@ channels:
   - name: D1Dpm
     mass : 2.426
     mass2: 1.86966
-    oam: 0
+    oam: 0 ## 2
     coupling_group: D1D
     open_charm: true
     tex: '$D^{+}_{1}(2420)D^{-}$'
@@ -173,12 +186,29 @@ channels:
 # `couplings` must give one entry per coupling group used by the channels
 # above (here: ee, DD, DstDst).
 resonances:
+  - label: "0" ## fixed the psi(2S)
+    mass:
+      start: 3.6861
+      limits: "FIXED"
+    couplings:
+      ee:  {start: 0.30, limits: [0, 8.0]}
+      eff_psi_2S:  {start: 0.30, limits: [0, 8.0]}
+      DD:  {start: 0.50, limits: [-8.0, 8.0]}
+      DsDs:  {start: 0.0, limits: [-8.0, 8.0]}
+      DstDst: {start: 0.0, limits: [-8.0, 8.0]}
+      DstD: {start: 0.0, limits: [-8.0, 8.0]}
+      DstDs: {start: 0.0, limits: [-8.0, 8.0]}
+      DstsDsts: {start: 0.0, limits: [-8.0, 8.0]}
+      D1D: {start: 0.0, limits: [-8.0, 8.0]}
+      D2D: {start: 0.0, limits: [-8.0, 8.0]}
+      
   - label: "1" ## trying to make this the psi(3770)
     mass:
       start: 3.773
-      limits: "FIXED"
+      limits:  "FIXED" ## [3.7, 3.8] ##
     couplings:
-      ee:  {start: 0.30, limits: [-8.0, 8.0]}
+      ee:  {start: 0.30, limits: [0., 8.0]}
+      eff_psi_2S:  {start: 0.0, limits: "FIXED"}
       DD:  {start: 0.50, limits: [-8.0, 8.0]}
       DsDs:  {start: 0.10, limits: [-8.0, 8.0]}
       DstDst: {start: 0.10, limits: [-8.0, 8.0]}
@@ -193,7 +223,8 @@ resonances:
       start: 4.010 ## could be near the psi(4040)?
       limits: [3.8, 4.12]
     couplings:
-      ee:  {start: 0.60, limits: [-8.0, 8.0]}
+      ee:  {start: 0.60, limits: [0., 8.0]}
+      eff_psi_2S:  {start: 0.0, limits: "FIXED"}
       DD:  {start: 0.30, limits: [-8.0, 8.0]}
       DsDs:  {start: 0.10, limits: [-8.0, 8.0]}
       DstDst: {start: 0.60, limits: [-8.0, 8.0]}
@@ -208,7 +239,8 @@ resonances:
       start: 4.190 ## looks like psi(4160)
       limits: [4.12, 4.30]
     couplings:
-      ee:  {start: 0.40, limits: [-8.0, 8.0]}
+      ee:  {start: 0.40, limits: [0., 8.0]}
+      eff_psi_2S:  {start: 0.0, limits: "FIXED"}
       DD:  {start: 0.30, limits: [-8.0, 8.0]}
       DsDs:  {start: 0.10, limits: [-8.0, 8.0]}
       DstDst: {start: 0.60, limits: [-8.0, 8.0]}
@@ -224,7 +256,8 @@ resonances:
       start: 4.420
       limits: [4.30, 4.45]
     couplings:
-      ee:  {start: 0.40, limits: [-8.0, 8.0]}
+      ee:  {start: 0.40, limits: [0., 8.0]}
+      eff_psi_2S:  {start: 0.0, limits: "FIXED"}
       DD:  {start: 0.30, limits: [-8.0, 8.0]}
       DsDs:  {start: 0.10, limits: [-8.0, 8.0]}
       DstDst: {start: 0.60, limits: [-8.0, 8.0]}
@@ -253,3 +286,4 @@ continuum:
     DstsDsts: {start: 0.0, limits: [-8.0, 8.0]}
     D1D: {start: 0.0, limits: [-8.0, 8.0]}
     D2D: {start: 0.0, limits: [-8.0, 8.0]}
+    eff_psi_2S:  {start: 0.0, limits: "FIXED"}
