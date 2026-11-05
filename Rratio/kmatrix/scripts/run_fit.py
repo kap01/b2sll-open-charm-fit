@@ -23,14 +23,14 @@ from fitting   import build_parameter_spec, KMatrixFit
 from reporting import *
 
 if __name__ == "__main__":
-    CONFIG_FILE = USER_PATH + "kmatrix/config/safe_config.yml"
+    CONFIG_FILE = USER_PATH + "kmatrix/config/change_background.yml"
 
     config = load_config(CONFIG_FILE)
     try:
         validate_config(config)
     except ValueError as e:
         print(e)
-        sys.exit(1)
+        raise SystemExit(1) from None ## will still make noisy printout if in interactive mode (python -i run_fit.py)
 
     setup = build_channel_setup(config)
     param_spec = build_parameter_spec(config, setup)
@@ -60,10 +60,16 @@ if __name__ == "__main__":
         print("\033[1;93m[FITTER WARNING]\033[0m ***WARNING***")
         print("              check the R_model as it is returning some complex values")
 
+    ## what is the biggest coupling to set the scale in a minute?
+    par = [best.values[name] for name in param_spec.names]
+    bare_masses, g, c, baseline = param_spec.unpack(par)
+    max_coupling = max(np.nanmax(abs(g)), np.nanmax(abs(c)))
+
     ## save output                       
     save_conditions(param_spec, setup,  config['fit']['fit_range'], out_txt=f"{today}/{outfolder}/fit_conditions.txt")
     report(best, fitter.status, param_spec, data, out_txt=f"{today}/{outfolder}/fit_result.txt")
     limit_warning(best, param_spec) ## after the above function as report is a big chunk of text in the terminal
     make_plot(best, param_spec, setup, data, config["plotting"], source_ids, out_pdf=f"{today}/{outfolder}/fit_result.pdf")
-    couplings_plot(best, param_spec, setup, config['plotting'], out_pdf=f"{today}/{outfolder}/couplings.pdf")
+    couplings_plot(best, param_spec, setup, config['plotting'], vmax=max_coupling, out_pdf=f"{today}/{outfolder}/couplings.pdf")
+    nonresonant_plot(best, param_spec, setup, config['plotting'], vmax=max_coupling, out_pdf=f"{today}/{outfolder}/nonresonant.pdf")
     plot_covariance(best, param_spec, out_pdf=f"{today}/{outfolder}/correlations.pdf")

@@ -127,7 +127,7 @@ def precompute_kinematics(sqrt_s, setup):
 
 
 ## ------------------------------------------------------------- K-matrix / amplitude
-def build_K(s, bare_masses, g):
+def build_K(s, bare_masses, g, c):
     """bare_masses: (n_res,); g: (n_res, N_ch). Returns K: (N_s, N_ch, N_ch).
     Unchanged: real, symmetric pole expansion, Eq. (9) (background term
     omitted, matching the existing config)."""
@@ -140,10 +140,11 @@ def build_K(s, bare_masses, g):
         denom = np.where(np.abs(denom) < EPSILON, EPSILON, denom)
         ga = g[a]
         K += (ga[None, :, None] * ga[None, None, :]) / denom[:, None, None]
+    K += c[None, :, :]
     return K
 
 
-def M_matrix(bare_masses, g, setup, kinematics):
+def M_matrix(bare_masses, g, c, setup, kinematics):
     """Full K-matrix scattering amplitude, Eq. (1):
         M(s) = n(s) [1 - K(s) Sigma(s)]^-1 K(s) n(s)
     kinematics  : instance of class storing
@@ -157,7 +158,7 @@ def M_matrix(bare_masses, g, setup, kinematics):
 
     N_s = kinematics.s.shape[0]
     N_ch = setup.N_ch
-    K = build_K(kinematics.s, bare_masses, g).astype(complex)
+    K = build_K(kinematics.s, bare_masses, g, c).astype(complex)
     I = np.broadcast_to(np.eye(N_ch, dtype=complex), (N_s, N_ch, N_ch))
     bracket = np.matmul(np.linalg.inv(I - np.matmul(K, kinematics.Sigma)), K)
     
@@ -167,16 +168,14 @@ def M_matrix(bare_masses, g, setup, kinematics):
 
 ## ------------------------------------------------------------------ R model
 ## version with the model only for fitting
-def R_model(bare_masses, g, b, baseline, kinematics, setup):
-    """Generic R-ratio model, any number of channels / resonances.
-    Interface unchanged from before -- only the internals of M_matrix /
-    self_energy_function / vertex_vector changed."""
-    M = M_matrix(bare_masses, g, setup, kinematics)
+def R_model(bare_masses, g, c, baseline, kinematics, setup):
+    """Generic R-ratio model, any number of channels / resonances."""
+    M = M_matrix(bare_masses, g, c, setup, kinematics)
 
     R_res = np.zeros_like(kinematics.sqrt_s)
     p0 = setup.production_idx
-    for j in setup.open_charm_idxs:
-        R_res += (2*setup.oam[j]+1) * kinematics.rho[:, j] * np.abs(M[:, p0, j] + b[j]) ** 2
+    for j in setup.channel_idxs:
+        R_res += (2*setup.oam[j]+1) * kinematics.rho[:, j] * np.abs(M[:, p0, j]) ** 2
 
     scaling = 3* 137**2 / (16*np.pi)
     R_res = R_res*scaling + baseline
@@ -184,22 +183,20 @@ def R_model(bare_masses, g, b, baseline, kinematics, setup):
     return R_res
 
 ## version including the separated parts:
-def R_model_separated(bare_masses, g, b, baseline, kinematics, setup):
-    """Generic R-ratio model, any number of channels / resonances.
-    Interface unchanged from before -- only the internals of M_matrix /
-    self_energy_function / vertex_vector changed."""
-    M = M_matrix(bare_masses, g, setup, kinematics)
+def R_model_separated(bare_masses, g, c, baseline, kinematics, setup):
+    """Return the R_model as well as the separated resonance + non resonant
+    contributions for plotting, plus the continuum"""
+    M_total  = M_matrix(bare_masses, g, c,                        setup, kinematics)
+    M_res    = M_matrix(bare_masses, g, np.zeros_like(c),         setup, kinematics)
+    M_bkg    = M_matrix(np.ones_like(bare_masses), np.zeros_like(g), c, setup, kinematics) ## note ones to avoid bad pole behaviour
 
-    R_res = np.zeros_like(kinematics.sqrt_s)
-    R_bg = np.zeros_like(kinematics.sqrt_s)
     p0 = setup.production_idx
-    for j in setup.open_charm_idxs:
-        R_res += (2*setup.oam[j]+1) * kinematics.rho[:, j] * np.abs(M[:, p0, j] + b[j]) ** 2
-        R_bg += (2*setup.oam[j]+1) * kinematics.rho[:, j] * np.abs(b[j]) ** 2
+    scaling = 3 * 137**2 / (16 * np.pi)
 
-    scaling = 3* 137**2 / (16*np.pi)
-    R_res *= scaling
-    R_bg *= scaling
-    
-    R_baseline = np.full_like(kinematics.sqrt_s, baseline)
-    return baseline + R_res, R_baseline, baseline + R_bg
+    def to_R(M):
+        R = np.zeros_like(kinematics.sqrt_s)
+        for j in setup.channel_idxs:
+            R += (2*setup.oam[j]+1) * kinematics.rho[:, j] * np.abs(M[:, p0, j])**2
+        return R * scaling + baseline
+
+    return to_R(M_total), to_R(M_res), to_R(M_bkg)

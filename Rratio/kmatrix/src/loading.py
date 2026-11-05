@@ -17,10 +17,10 @@ class ChannelSetup:
     mutate shared setup state that every other caller also depends on."""
 
     _fields = ("names", "masses", "oam", "groups", "tex", "production_idx",
-               "open_charm_idxs", "z0", "penalty", "latest_CMs")
+               "channel_idxs", "group_idxs", "groups_set", "z0", "penalty", "latest_CMs")
 
-    def __init__(self, names, masses, masses2, oam, groups, tex,
-                 production_idx, open_charm_idxs, z0, penalty, latest_CMs):
+    def __init__(self, names, masses, masses2, oam, groups, tex, production_idx,
+                 channel_idxs, group_idxs, groups_set, z0, penalty, latest_CMs):
         self.__dict__["names"] = names                         # channel names, index-aligned; for reporting/plotting only
         self.__dict__["masses"] = masses                       # (N_ch,) threshold mass of one leg of each channel - this first particle
         self.__dict__["masses2"] = masses2                     # (N_ch,) threshold mass of one leg of each channel - the second particle
@@ -28,7 +28,9 @@ class ChannelSetup:
         self.__dict__["groups"] = groups                       # (N_ch,) coupling-group name per channel, index-aligned
         self.__dict__["tex"] = tex                             # (N_ch,) tex for each of the channels to label on the plot
         self.__dict__["production_idx"] = production_idx       # index of the channel the photon couples to
-        self.__dict__["open_charm_idxs"] = open_charm_idxs     # indices of channels summed over in R
+        self.__dict__["channel_idxs"] = channel_idxs           # indices of channels summed over in R
+        self.__dict__["group_idxs"] = group_idxs               # indices of the group each channel uses, i.e. index version of groups
+        self.__dict__["groups_set"] = groups_set                 # set of .groups, order preserved, matches index in group_idx
         self.__dict__["z0"] = z0                               # Blatt-Weisskopf radius parameter
         self.__dict__["penalty"] = penalty                     # Constants for the penalty term
         self.__dict__["latest_CMs"] = latest_CMs               # Store CM path here so can be used with build_CM_filename
@@ -40,6 +42,10 @@ class ChannelSetup:
     @property
     def N_ch(self):
         return len(self.names)
+
+    @property
+    def N_g(self):
+        return len(set(self.groups))
 
     def __repr__(self):
         fields = ", ".join(f"{f}={getattr(self, f)!r}" for f in self._fields)
@@ -66,7 +72,7 @@ def validate_config(config):
     Raises ValueError with a specific message on failure."""
 
     ## check all top-level keys present
-    for key in ("channels", "resonances", "continuum", "paths", "plotting"):
+    for key in ("channels", "resonances", "baseline", "non_resonant", "paths", "plotting", "constants"):
         if key not in config:
             raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m config is missing required top-level key '{key}'")
 
@@ -74,44 +80,58 @@ def validate_config(config):
     if "CM_path" not in config["paths"]:
         raise ValueError("\033[1;93m[CONFIG WARNING]\033[0m No path for Chew Mandelstam lookup table specified")
 
-    channels = config["channels"]
-    resonances = config["resonances"]
+    channels_cfg = config["channels"]
+    resonances_cfg = config["resonances"]
+    non_resonant_cfg = config["non_resonant"]
     ## check at least 2 channels
-    if len(channels) < 2:
+    if len(channels_cfg) < 2:
         raise ValueError("\033[1;93m[CONFIG ERROR]\033[0m need at least two channels (one production, one open-charm)")
 
     ## check only 1 production channel
-    n_production = sum(1 for c in channels if c.get("role") == "production")
+    n_production = sum(1 for c in channels_cfg if c.get("role", None) == "production")
     if n_production != 1:
         raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m exactly one channel must have role: production (found {n_production})")
 
     ## check coupling group specified for all non-prodution channels
-    for c in channels:
+    for c in channels_cfg:
         if c.get("role") != "production" and "coupling_group" not in c:
             raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m channel '{c.get('name', '?')}' needs a coupling_group")
 
     ## check at least one resonances
-    if len(resonances) < 1:
+    if len(resonances_cfg) < 1:
         raise ValueError("\033[1;93m[CONFIG ERROR]\033[0m need at least one resonance")
 
     ## check each resonances has a mass and list of couplings
-    for r in resonances:
+    for r in resonances_cfg:
         if "label" not in r or "mass" not in r or "couplings" not in r:
             raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m malformed resonance entry: {r}")
     
     ## check all coupling groups have a channel
     r_cgs = []
-    for r in resonances:
+    for r in resonances_cfg:
         for cg in r["couplings"].keys():
             if cg not in r_cgs:
                 r_cgs.append(cg)
-    c_cgs = list(set([c["coupling_group"] for c in channels]))
+    c_cgs = list(set([c["coupling_group"] for c in channels_cfg]))
     for cg in r_cgs:
         if cg not in c_cgs:
             raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m coupling group '{cg}' used in resonances but does not belong to any channel")
 
+    ## check non resonant matrices present + right shape (lower triangular, dim of N_groups x N_groups)
+    N_g = len(c_cgs)
+    for key in ["starts", "limits_lo", "limits_hi"]:
+        try:
+            mat = non_resonant_cfg[key]
+        except KeyError:
+            raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m Missing the setup {key} in the non_resonant contribution")
+        for this_len, row in zip(range(1, N_g+1), mat):
+            if len(row) != this_len:
+                raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m Malformed non_resonant {key} matrix")
+
+
+
     ## check fit range specified
-    if config['fit'].get('fit_range') == None:
+    if config['fit'].get('fit_range', None) == None:
         print("[CONFIG WARNING] no fit limits set, using range 0-10 to encompass all expected data points")
         config['fit']['fit_range'] = {}
         config['fit']['fit_range']['low'] = 0.
@@ -126,20 +146,30 @@ def build_channel_setup(config):
     """Turn config['channels'] + config['constants'] into a ChannelSetup."""
     channels_cfg = config["channels"]
 
+    ## get the basic information from each channel
     names = tuple(c["name"] for c in channels_cfg)
     masses  = np.array([c["mass"] for c in channels_cfg], dtype=float)
     masses2 = np.array([c["mass2"] for c in channels_cfg], dtype=float)
     oam = np.array([c["oam"] for c in channels_cfg], dtype=int)
     tex = [c.get("tex", c["name"]) for c in channels_cfg]
 
-    production_idx = next(i for i, c in enumerate(channels_cfg) if c.get("role") == "production")
+    ## find the production channel (expect ee)
+    production_idx = next(i for i, c in enumerate(channels_cfg) if c["role"] == "production") # already validated only one production channel
 
+    ## find the coupling group for each channel
     groups = []
     for i, c in enumerate(channels_cfg):
-        groups.append(c["name"] if i == production_idx else c["coupling_group"])
+        groups.append(c["coupling_group"])
     groups = tuple(groups)
 
-    open_charm_idxs = tuple(i for i, c in enumerate(channels_cfg) if c.get("open_charm", False))
+    ## get the indicies of all non-production channels
+    channel_idxs = tuple(i for i in range(len(channels_cfg)) if i != production_idx)
+
+    ## list equivlanet to groups that is the idx of each group in order
+    groups_set = list(dict.fromkeys(groups))
+    group_idxs = []
+    for g in groups:
+        group_idxs.append(groups_set.index(g))
 
     constants = config.get("constants", {})
     if "z0" in constants:
@@ -157,7 +187,7 @@ def build_channel_setup(config):
     latest_CMs = config["paths"]["CM_path"]
 
     return ChannelSetup(names=names, masses=masses, masses2=masses2, oam=oam, groups=groups, tex=tex, production_idx=production_idx,
-                        open_charm_idxs=open_charm_idxs, z0=z0, penalty=penalty, latest_CMs=latest_CMs)
+                        channel_idxs=channel_idxs, group_idxs=group_idxs, groups_set=groups_set, z0=z0, penalty=penalty, latest_CMs=latest_CMs)
 
 
 def load_data(paths, fit_range, return_id=False):

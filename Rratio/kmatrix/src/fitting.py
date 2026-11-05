@@ -8,7 +8,7 @@ from time import time
 ## ------------------------------------------------------------------ parameter bookkeeping
 class ParameterSpec:
     """Flat, Minuit-facing view of the fit parameters, plus the index maps
-    needed to unpack a flat array back into (bare_masses, g, b, baseline)
+    needed to unpack a flat array back into (bare_masses, g_k^r, c_ij, baseline)
     without any function ever referring to a parameter by name.
 
     Mutable (unlike ChannelSetup): fields can be tweaked after construction,
@@ -16,17 +16,17 @@ class ParameterSpec:
     without rebuilding the whole object from the config."""
 
     _fields = ("names", "start", "limits", "baseline_idx",
-               "res_mass_idx", "res_coupling_idx", "continuum_coupling_idx")
+               "res_mass_idx", "res_coupling_idx", "non_res_idx")
 
     def __init__(self, names, start, limits, baseline_idx,
-                 res_mass_idx, res_coupling_idx, continuum_coupling_idx):
+                 res_mass_idx, res_coupling_idx, non_res_idx):
         self.names = names                                   # list of parameter names
         self.start = start                                   # (n_params,) starting values, same order as names
         self.limits = limits                                 # list of (lo, hi), same order as names
-        self.baseline_idx = baseline_idx                      # flat-array index of the baseline parameter
-        self.res_mass_idx = res_mass_idx                      # [n_res] -> index into the flat array
-        self.res_coupling_idx = res_coupling_idx              # [n_res][N_ch] -> index into the flat array
-        self.continuum_coupling_idx = continuum_coupling_idx  # [N_ch] -> index into the flat array, or -1
+        self.baseline_idx = baseline_idx                     # flat-array index of the baseline parameter
+        self.res_mass_idx = res_mass_idx                     # [n_res] -> index into the flat array
+        self.res_coupling_idx = res_coupling_idx             # [n_res][N_ch] -> index into the flat array
+        self.non_res_idx = non_res_idx         # [N_ch, N_ch] -> index into the matrix
 
     def __repr__(self):
         fields = ", ".join(f"{f}={getattr(self, f)!r}" for f in self._fields)
@@ -42,37 +42,60 @@ class ParameterSpec:
             for f in self._fields
         )
 
+    @property
+    def n_res(self):
+        return len(self.res_mass_idx)
+
     def unpack(self, par):
-        n_res = len(self.res_mass_idx)
-        N_ch = len(self.continuum_coupling_idx)
+        """Turns the flat list of idxs/values into the physics categories:
+        par         : flat list of all fit parameters in expected order, e.g. extracted from minuit
+        bare_masses : (n_res,)
+        g           : (n_res, N_ch)
+        c           : (N_ch, N_ch)  real, symmetric background K-matrix
+        baseline    : scalar
+        """
+        # n_res = self.n_res ## len(self.res_mass_idx)
+        N_ch = len(self.non_res_idx)
+
+        ## pick out the poles from the parameters list
         bare_masses = np.array([par[i] for i in self.res_mass_idx])
-        g = np.zeros((n_res, N_ch))
-        # scaler = 1
-        for a in range(n_res):
-            g[a] = [par[i] for i in self.res_coupling_idx[a]]
-            ## HARDCODING THE RELATIVE COUPLING FOR THE D CHANNELS
-            # g[a][2] = scaler * g[a][1] ## first idx for DpDm channel, second idx for DzDzbar channel
-            # g[a][5] = scaler * g[a][4] ## first idx for DpDm channel, second idx for DzDzbar channel
-        b = np.array([par[i] if i >= 0 else 0.0 for i in self.continuum_coupling_idx])
-        ## HARDCODING THE RELATIVE COUPLING FOR THE D CHANNELS
-        # b[2] = scaler * b[1]
-        # b[5] = scaler * b[4]
+
+        ## pick out the couplings from the parameters list, makes a 2D list of resonance then channel
+        ## for g^r_c, returns the same value if channels share coupling group
+        g = np.zeros((self.n_res, N_ch))
+        for r in range(self.n_res):
+            g[r] = [par[k] for k in self.res_coupling_idx[r]]
+
+        ## pick out the non resonant background terms, will make a sym matrix of channels
+        c = np.zeros((N_ch, N_ch))
+        for i in range(N_ch):
+            for j in range(N_ch):
+                c[i, j] = par[self.non_res_idx[i][j]]
+
+        ## pick out the continuum term (R_uds)
         baseline = par[self.baseline_idx]
-        return bare_masses, g, b, baseline
+
+        return bare_masses, g, c, baseline
 
     def kind_of(self, i):
         """'mass', 'baseline', or 'coupling' -- used to pick a jitter size
         for restart k>0 in KMatrixFit.run()."""
         if i == self.baseline_idx:
             return "baseline"
-        if i in self.res_mass_idx:
+        elif i in self.res_mass_idx:
             return "mass"
+        else:
+            for row in self.non_res_idx:
+                if i in row:
+                    return "non_res"
         return "coupling"
 
 
 def build_parameter_spec(config, channel_setup):
-    """Build a ParameterSpec from config['resonances'] / config['continuum'],
-    resolved against the channel groups in `setup` (a ChannelSetup)."""
+    """Build a ParameterSpec from config['resonances'] / config['continuum'], 
+    (config['channels'] contains no fit parameters and are contained in channel_setup 
+    object channel_setup)."""
+
     names, start, limits = [], [], []
 
     def add(name, start_val, lims):
@@ -82,25 +105,25 @@ def build_parameter_spec(config, channel_setup):
         limits.append(lims)
         return idx
 
-    cont_cfg = config["continuum"]
-    baseline_cfg = cont_cfg["baseline"]
-    baseline_name = baseline_cfg.get("name", "baseline")
-    baseline_idx = add(baseline_name, baseline_cfg["start"], baseline_cfg["limits"])
+    ## - extract baseline continuum contribution, likely fixed but can be a fit parameter
+    baseline_cfg = config["baseline"]
+    baseline_idx = add(baseline_cfg["name"], baseline_cfg["start"], baseline_cfg["limits"])
 
-    continuum_group_idx = {}
-    for group, spec in cont_cfg.get("couplings", {}).items():
-        continuum_group_idx[group] = add(f"b_{group}", spec["start"], spec["limits"])
-
+    ## - extract poles and couplings for each resonance
     res_mass_idx = []
     res_group_idx = []          # [n_res] dict: group name -> flat index
     for r in config["resonances"]:
         label = r["label"]
         res_mass_idx.append(add(f"M_{label}", r["mass"]["start"], r["mass"]["limits"]))
+        ## - build map of coupling_group : idx, one map per res
         gmap = {}
         for group, cspec in r["couplings"].items():
             gmap[group] = add(f"g_{label}_{group}", cspec["start"], cspec["limits"])
         res_group_idx.append(gmap)
 
+    ## - turn the map of coupling groups into channel idx
+    ## (can find the idx for the coupling g value of a given channel without needing it's coupling group)
+    ## i.e. turning the list of dicts into a list of lists
     res_coupling_idx = []
     for gmap in res_group_idx:
         row = []
@@ -110,15 +133,37 @@ def build_parameter_spec(config, channel_setup):
             row.append(gmap[ch_group])
         res_coupling_idx.append(row)
 
-    continuum_coupling_idx = [
-        -1 if i == channel_setup.production_idx else continuum_group_idx.get(ch_group, -1)
-        for i, ch_group in enumerate(channel_setup.groups)
-    ]
+    ## - extract the non resonant contribution matrix elements, c_ij
+    nonres_cfg = config["non_resonant"] ## remember is already validated
+    non_res_idx = [[None]*channel_setup.N_ch for _ in range(channel_setup.N_ch)]
+    for i in range(channel_setup.N_ch):
+        i_group = channel_setup.group_idxs[i] ## convert channel idx -> group idx
+        # print(">>> >>>", i, " -> ", i_group)
+        for j in range(i+1):   # expect lower triangle; j <= i
+            j_group = channel_setup.group_idxs[j] ## convert channel idx -> group idx
+            # print(">>>", j, " -> ", j_group)
+            st = nonres_cfg["starts"][i_group][j_group]
+            lo = nonres_cfg["limits_lo"][i_group][j_group]
+            hi = nonres_cfg["limits_hi"][i_group][j_group]
+
+            if lo == "FIXED" or hi == "FIXED":
+                lims = "FIXED"
+            else:
+                lims = [lo, hi]
+            
+            ## recall we're looping over channels, only add a new fit parameter if it's a new group
+            name = f"c_{i_group}_{j_group}" ## NB c is indexing the group not the channels, may want to change naming convention later
+            if name not in names:
+                flat_idx = add(name, st, lims)
+            else:
+                flat_idx = names.index(name)
+            ## always add the index to the maps bit for referencing
+            non_res_idx[i][j] = flat_idx
+            non_res_idx[j][i] = flat_idx   # symmetry: same parameter, same index
 
     return ParameterSpec(names=names, start=np.array(start, dtype=float), limits=limits,
-                          baseline_idx=baseline_idx, res_mass_idx=res_mass_idx,
-                          res_coupling_idx=res_coupling_idx,
-                          continuum_coupling_idx=continuum_coupling_idx)
+                         baseline_idx=baseline_idx, res_mass_idx=res_mass_idx,
+                         res_coupling_idx=res_coupling_idx, non_res_idx=non_res_idx)
 
 
 ## ------------------------------------------------------------------ cost function
@@ -138,15 +183,15 @@ class AsymChi2:
         self.kinematics_penalty = precompute_kinematics(np.array([self.penalty_sqrt_s]), channel_setup)
 
     def __call__(self, par):
-        bare_masses, g, b, baseline = self.param_spec.unpack(par)
-        m = R_model(bare_masses, g, b, baseline, self.kinematics, self.setup)
+        bare_masses, g, c, baseline = self.param_spec.unpack(par)
+        m = R_model(bare_masses, g, c, baseline, self.kinematics, self.setup)
         if not np.all(np.isfinite(m)):
             return 1e12
         sigma = np.where(m >= self.y, self.eyh, self.eyl)
         chi2 = np.sum(((m.real - self.y) / sigma) ** 2) ## use real part only, m.imag should be 0 anyway
 
         ## penalty term:
-        r_limit = R_model(bare_masses, g, b, baseline,
+        r_limit = R_model(bare_masses, g, c, baseline,
                      self.kinematics_penalty, self.setup)
         r_limit = r_limit[0].real ## 1 element array and only want real part
         if r_limit > self.penalty_r_max:
@@ -239,9 +284,9 @@ class KMatrixFit:
         best.hesse()
         if not(best.fmin.has_posdef_covar) or  best.fmin.has_made_posdef_covar or best.fmin.hesse_failed:
             print(f"\033[1;93m[FITTER WARNING]\033[0m Best fit reported has an issue, check below:")
-            print("                 Hesse() failed:                            ", best.fmin.hesse_failed)
-            print("                 Accurate + positive definite covariance:   ", best.fmin.has_posdef_covar)
-            print("                 Covariance forced to be positive definite: ", best.fmin.has_made_posdef_covar)
+            print("                 Hesse() failed:                                   ", best.fmin.hesse_failed)
+            print("                 Accurate + positive definite covariance:          ", best.fmin.has_posdef_covar)
+            print("                 Tried forcing covariance to be positive definite: ", best.fmin.has_made_posdef_covar)
             self.status = 3 if best.fmin.hesse_failed else 2 if not(best.fmin.has_posdef_covar) else 1 if best.fmin.has_made_posdef_covar else None
         else:
             print("\033[1;93m[FITTER INFO]\033[0m Fit is valid and covariance is positive definite and accurate")
@@ -259,6 +304,6 @@ class KMatrixFit:
         if self.minuit is None:
             raise RuntimeError("call new_minuit() (and usually run()) before evaluate()")
         par = [self.minuit.values[name] for name in self.param_spec.names]
-        bare_masses, g, b, baseline = self.param_spec.unpack(par)
+        bare_masses, g, c, baseline = self.param_spec.unpack(par)
         kinematics = precompute_kinematics(sqrt_s, self.channel_setup)
-        return R_model(bare_masses, g, b, baseline, kinematics, self.channel_setup)
+        return R_model(bare_masses, g, c, baseline, kinematics, self.channel_setup)

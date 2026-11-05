@@ -76,7 +76,7 @@ def save_conditions(param_spec, setup, limits, out_txt=None):
     for i, name in enumerate(setup.names):
         if i == setup.production_idx:
             role = "production"
-        elif i in setup.open_charm_idxs:
+        elif i in setup.channel_idxs:
             role = "open-charm"
         else:
             role = "closed"
@@ -158,17 +158,17 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
 
     ##  - prepare the parameters
     par = np.array([m.values[name] for name in param_spec.names])
-    bare_masses, g, b, baseline = param_spec.unpack(par)
+    bare_masses, g, c, baseline = param_spec.unpack(par)
 
     ## - calculate model value smoothly across plot range
     grid = np.linspace(plot_lo - 0.05, plot_hi + 0.05, 5000)
     kinematics = precompute_kinematics(grid, setup)
-    Rtot, Rbase, Rbg = R_model_separated(bare_masses, g, b, baseline, kinematics, setup)
+    Rtot, Rres, Rbg = R_model_separated(bare_masses, g, c, baseline, kinematics, setup)
 
     ##  - calculate pull distribution
     ## calculate model value at each datapoint for pulls
     kinematics_atData = precompute_kinematics(x, setup)
-    Rtot_atData = R_model(bare_masses, g, b, baseline, kinematics_atData, setup)
+    Rtot_atData = R_model(bare_masses, g, c, baseline, kinematics_atData, setup)
     ## choose the right sigma
     pull_sigma = np.where(Rtot_atData >= y, eyh, eyl)
     pulls = (Rtot_atData - y) / pull_sigma
@@ -192,8 +192,10 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
 
     ##  - plot the model
     ax.plot(grid, Rbg, "--", color="lightseagreen", lw=1.3,
-            label=r"non-resonant continuum ($|b|^2$)")
-    ax.plot(grid, Rbase, ":", color="violet", lw=1.2, label="light-quark baseline")
+            label=r"non-resonant contribution")
+    ax.plot(grid, Rres, "--", color="forestgreen", lw=1.3,
+            label=r"resonant contribution")
+    ax.plot(grid, [baseline]*len(grid), ":", color="violet", lw=1.2, label="light-quark baseline")
     ax.plot(grid, Rtot, "-", color="mediumvioletred", lw=2.1, zorder=60,
             label=r"K-matrix fit")
             # label=r"K-matrix fit ($\chi^2/\mathrm{ndf}=%.2f$)" % (m.fval/(len(x)-m.nfit)))
@@ -205,7 +207,7 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
 
     zorder=0
     first_loop=True
-    for i in setup.open_charm_idxs: ## don't know where the ee (i.e. non-o-c) channels are
+    for i in setup.channel_idxs: ## don't know where the ee (i.e. non-o-c) channels are
         m_threshold = setup.masses[i] + setup.masses2[i]
         if (m_threshold<plot_lo) or (m_threshold>plot_hi):
             print(f"\033[1;93m[REPORT INFO]\033[0m channel {i} with threshold {m_threshold} is out of plot range [{plot_lo}, {plot_hi}], omitting from plot")
@@ -272,41 +274,34 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
         return fig
 
 
-def couplings_plot(m, param_spec, setup, config, out_pdf=None):
+def couplings_plot(m, param_spec, setup, config, vmax=None, out_pdf=None):
     """Heatmap of fitted resonance couplings g_{r,c}: rows = resonances
     (r = 1, 2, 3, ...), columns = coupling groups / channels
     (c = ee, DD, Dst, ...). Reads resonance labels and group names
     straight off param_spec.names, so it works for any number of
     resonances or channels without changes."""
  
-    groups = [] ## because some couplings as grouped across channels i.e. D0D0bar and DpDm
-    [groups.append(c) for c in setup.groups if c not in groups] ## using list comprehsnion to preserve the order of the channels from config
-    tex = [config['group_tex'][g] for g in groups]
+    tex = [config['group_tex'][g] for g in setup.groups_set]
     resonances = [param_spec.names[i] for i in param_spec.res_mass_idx]
     resonances_masses = [np.round(m.values[r], 3) for r in resonances]
     resonances_tex = [f"${r}$ = {m}" for r,m in zip(resonances, resonances_masses)]
-    ## artifically add the background coupling
-    resonances += ["b"]
-    resonances_tex += ["(background)"]
     
-    z = np.full((len(resonances), len(groups)), np.nan)
-    for c, group in enumerate(groups):
+    z = np.full((param_spec.n_res, setup.N_g), np.nan)
+    for c, group in enumerate(setup.groups_set):
         for r, l in enumerate(resonances):
             ## background has different coupling name syntax:
-            if r != len(resonances)-1:
-                label = l[2:] ## because they are of the form M_X
-                name = f"g_{label}_{group}"
-            else:
-                name = f"b_{group}"
+            label = l[2:] ## because they are of the form M_X
+            name = f"g_{label}_{group}"
             if name in param_spec.names:
                 z[r, c] = m.values[name]
 
-    fig, ax = plt.subplots(figsize=(1.2*len(groups) + 2, 0.9*len(resonances) + 2))
-    vmax = np.nanmax(np.abs(z))
+    fig, ax = plt.subplots(figsize=(1.2*setup.N_g + 2, 0.9*param_spec.n_res + 2))
+    vmax = np.nanmax(np.abs(z)) if vmax is None else vmax
+
     im = ax.imshow(z, cmap=my_cmap, vmin=-vmax, vmax=vmax, aspect="auto")
  
-    ax.set_xticks(range(len(groups)))
-    ax.set_yticks(range(len(resonances)))
+    ax.set_xticks(range(setup.N_g))
+    ax.set_yticks(range(param_spec.n_res))
     # ax.set_yticklabels([f"resonance {label}" for label in labels])
     ax.set_xticklabels(tex)
     ax.set_yticklabels(resonances_tex)
@@ -314,10 +309,56 @@ def couplings_plot(m, param_spec, setup, config, out_pdf=None):
     ax.set_ylabel("resonance / GeV")
     ax.set_title(r"Fitted coupling constants $g^{r}_{c}$")
  
-    for r in range(len(resonances)):
-        for c in range(len(groups)):
+    for r in range(param_spec.n_res):
+        for c in range(setup.N_g):
             if not np.isnan(z[r, c]):
                 ax.text(c, r, f"{z[r, c]:.2f}", ha="center", va="center", fontsize=10,
+                        color="white" if abs(z[r, c]) > 0.6 * vmax else "black")
+ 
+    fig.colorbar(im, ax=ax, label="coupling value")
+    fig.tight_layout()
+ 
+    if out_pdf is not None:
+        fig.savefig(out_pdf, bbox_inches='tight')
+        print(f"\033[1;93m[REPORT INFO]\033[0m coupling plot saved to {out_pdf}")
+        return None
+    else:
+        return fig
+
+def nonresonant_plot(m, param_spec, setup, config, vmax=None, out_pdf=None):
+    """Heatmap of fitted non resonant contributions c_{i,j}: rows and cols
+    are the coupling groups."""
+ 
+    tex = [config['group_tex'][g] for g in setup.groups_set]
+    # resonances = [param_spec.names[i] for i in param_spec.res_mass_idx]
+    # resonances_masses = [np.round(m.values[r], 3) for r in resonances]
+    # resonances_tex = [f"${r}$ = {m}" for r,m in zip(resonances, resonances_masses)]
+
+    z = np.full((setup.N_g, setup.N_g), np.nan)
+    for r in range(setup.N_g):
+        for c in range(r+1):
+            name = f"c_{r}_{c}"
+            z[r, c] = m.values[name]
+            z[c, r] = m.values[name]
+
+    fig, ax = plt.subplots(figsize=(1.2*setup.N_g + 2, 0.9*setup.N_g + 2))
+    vmax = np.nanmax(np.abs(z)) if vmax is None else vmax
+
+    im = ax.imshow(z, cmap=my_cmap, vmin=-vmax, vmax=vmax, aspect="auto")
+ 
+    ax.set_xticks(range(setup.N_g))
+    ax.set_yticks(range(setup.N_g))
+    ax.set_xticklabels(tex)
+    ax.set_yticklabels(tex)
+    ax.set_xlabel("coupling groups")
+    ax.set_title(r"Fitted nonresonant contributions $c_{i,j}$")
+ 
+    for r in range(setup.N_g):
+        for c in range(r+1):
+            if not np.isnan(z[r, c]):
+                ax.text(c, r, f"{z[r, c]:.2f}", ha="center", va="center", fontsize=10,
+                        color="white" if abs(z[r, c]) > 0.6 * vmax else "black")
+                ax.text(r, c, f"{z[r, c]:.2f}", ha="center", va="center", fontsize=10,
                         color="white" if abs(z[r, c]) > 0.6 * vmax else "black")
  
     fig.colorbar(im, ax=ax, label="coupling value")
@@ -339,14 +380,17 @@ def plot_covariance(m, param_spec, out_pdf=None):
         raise RuntimeError("Minuit has no covariance matrix -- call m.hesse() first "
                             "(KMatrixFit.run() already does this before returning)")
  
-    names = param_spec.names
+    ## remove all fixed variables:
+    free = [i for i, name in enumerate(param_spec.names) if not m.fixed[name]]
+    corr = m.covariance[np.ix_(free, free)].correlation()
+
+    ## get the names of these parameters
+    names = [param_spec.names[f] for f in free]
     n = len(names)
- 
-    matrix = np.array(m.covariance.correlation())
-    vlim = 1.
 
     fig, ax = plt.subplots(figsize=(0.55*n + 3, 0.55*n + 3))
-    im = ax.imshow(matrix, cmap=my_cmap, vmin=-vlim, vmax=vlim)
+    vlim = 1.
+    im = ax.imshow(corr, cmap=my_cmap, vmin=-vlim, vmax=vlim)
  
     ax.set_xticks(range(n))
     ax.set_xticklabels(names, rotation=90, fontsize=8)
