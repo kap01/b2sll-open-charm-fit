@@ -124,9 +124,12 @@ def validate_config(config):
             mat = non_resonant_cfg[key]
         except KeyError:
             raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m Missing the setup {key} in the non_resonant contribution")
+        ## check number of rows is correct:
+        if len(mat) != N_g:
+            raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m Malformed non_resonant {key} matrix, number of rows =/= number of coupling groups")
         for this_len, row in zip(range(1, N_g+1), mat):
             if len(row) != this_len:
-                raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m Malformed non_resonant {key} matrix")
+                raise ValueError(f"\033[1;93m[CONFIG ERROR]\033[0m Malformed non_resonant {key} matrix, number of columns =/= number of coupling groups")
 
 
 
@@ -251,3 +254,124 @@ def load_cm_vals(setup, channel_idx, user_path=USER_PATH):
 
     ref_s = np.sqrt(lookup_table[1].real)
     return ref_s, lookup_table[0]
+
+
+def load_fit_result(path):
+    """Read a fit_result.txt written by reporting.report() and return a plain
+    dict that carries everything needed to reproduce the plots."""
+    values, errors, fixed = {}, {}, {}
+    chi2, ndf, fit_status = None, None, None
+
+    with open(path, 'r') as infile:
+        for raw in infile:
+            line = raw.strip()
+
+            ## - get the chi2, e.g. " Fit status   : 2    - Fit is valid but covariance not postive definite"
+            if line.startswith("Fit status "):
+                fit_status = int(line.split(":")[-1].strip().split("-")[0])
+            ## - get the chi2, e.g. " chi2         : 71.82"
+            if line.startswith("chi2 "):
+                chi2 = float(line.split(":")[1].strip())
+            ## get the ndf, e.g. "ndf          : 116   (N = 127, free params = 11)"
+            elif line.startswith("ndf "):
+                ndf = int(line.split(":")[1].split("(")[0].strip())
+
+            ## - get the parameter results, two possibilities for free/fixed results:
+            ## free:  "   g_0_ee         =   +0.3412  +/- 0.0231"
+            ## fixed: "   M_0            =   +3.6861      ------"
+            if "=" in line and not line.startswith("="):
+                name, rest = line.split("=", 1)
+                name = name.strip()
+                rest = rest.strip()
+
+                if "------" in rest: ## must be fixed: value is whatever comes before the dashes
+                    val_str = rest.replace("------", "").strip()
+                    values[name] = float(val_str)
+                    errors[name] = None
+                    fixed[name]  = True
+                elif "+/-" in rest: ## must be free: there is a value and unc to split up
+                    val_str, err_str = rest.split("+/-")
+                    values[name] = float(val_str.strip())
+                    errors[name] = float(err_str.strip())
+                    fixed[name]  = False
+
+    if not values:
+        raise ValueError(
+            f"\033[1;93m[LOAD ERROR]\033[0m No parameter lines found in {path}.\n"
+            "             Check the file was written by reporting.report()."
+        )
+    if chi2 is None or ndf is None:
+        raise ValueError(
+            f"\033[1;93m[LOAD ERROR]\033[0m Could not parse chi2 / ndf from {path}."
+        )
+
+    print(f"\033[1;93m[LOAD INFO]\033[0m Read fit result from {path}")
+    print(f"            chi2={chi2:.2f}  ndf={ndf}  fit_status={fit_status}")
+    print(f"            {sum(not v for v in fixed.values())} free + {sum(fixed.values())} fixed parameters")
+
+    return {
+        "chi2"       : chi2,
+        "ndf"        : ndf,
+        "fit_status" : fit_status,
+        "values"     : values,
+        "errors"     : errors,
+        "fixed"      : fixed,
+    }
+
+
+def load_fit_conditions(path):
+    """Read a fit_conditions.txt file written by reporting.save_conditions()
+    and return a dict that can be used to overwrite options in a config.
+    """
+    conditions = {}
+    in_channels = False
+    channels = []
+    resonances = []
+
+    with open(path, 'r') as infile:
+        for raw in infile:
+            line = raw.strip()
+
+            if line.startswith("-- channels --"): ## next loop will go through channels
+                in_channels = True
+                continue
+            elif line.startswith("--") or line.startswith("="): ## next loop will stop going through channels
+                in_channels = False
+            elif in_channels and line:
+                # format: "[0] ee           mass=0.000511  L=0  group=ee       (production)"
+                line = line.split("]", 1)[1].strip()
+                name, rest = line.split(None, 1)
+                tokens = {}
+                for token in rest.split():
+                    if "=" in token:
+                        k, v = token.split("=", 1)
+                        tokens[k] = v
+                    elif token.startswith("(") and token.endswith(")"):
+                        tokens["role"] = token.strip("()")
+                channels.append({
+                    "name":           name,
+                    "mass":           float(tokens["mass"]),
+                    "oam":            int(tokens["L"]),
+                    "coupling_group": tokens["group"].rstrip(","),
+                })
+            elif line.startswith("Fit range"):
+                # format: "   Fit range                 : 3.7 - 3.83"
+                value_part = line.split(":", 1)[1].strip()
+                lo_str, hi_str = value_part.split("-")
+                conditions.setdefault("fit", {})["fit_range"] = {
+                    "low":  float(lo_str.strip()),
+                    "high": float(hi_str.strip()),
+                }
+            elif line.startswith("z0 value"):
+                # format: "   z0 value (q0 value)       : 3.0 (0.3333)"
+                value_part = line.split(":", 1)[1].strip()
+                z0_val = value_part.split("(")[0].strip()
+                conditions.setdefault("constants", {})["z0"] = int(z0_val)
+            elif line.startswith("Number of resonances"):
+                value_part = line.split(":", 1)[1].strip()
+                n_val = int(value_part.split("(")[0].strip())
+                conditions["resonances"] = n_val
+
+    conditions["channels"] = channels
+
+    return conditions

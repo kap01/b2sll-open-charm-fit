@@ -11,6 +11,7 @@ warnings.filterwarnings('ignore', category=np.exceptions.ComplexWarning)
 
 from chew_mandelstams import s_threshold
 from physics import R_model, R_model_separated, precompute_kinematics
+from loading import load_data, USER_PATH
 
 mytrapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 
@@ -135,17 +136,17 @@ def report(m, fit_status, param_spec, data, out_txt=None):
         print(f"\033[1;93m[REPORT INFO]\033[0m fit result saved to {out_txt}")
 
 
-def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
-    plot_lo, plot_hi = config["limits"]["low"], config["limits"]["high"]
+def make_plot(m, param_spec, setup, data, config, out_pdf=None):
+    plot_cfg = config["plotting"]
+    plot_lo, plot_hi = plot_cfg["limits"]["low"], plot_cfg["limits"]["high"]
 
     ## - prepare data
     ## load the data:
-    x_all, y_all, eyl_all, eyh_all = data
+    x_all, y_all, eyl_all, eyh_all, ids = load_data([USER_PATH+p for p in config["paths"]["data_path"]], plot_cfg['limits'], return_id=True) ##data
     ## sort in terms of sqrt s value
     sorted_idx = np.argsort(x_all)
     ## shuffle all the data to be in sorted order
-    x_all, y_all, eyl_all, eyh_all, ids = (x_all[sorted_idx], y_all[sorted_idx], eyl_all[sorted_idx], 
-                                            eyh_all[sorted_idx], ids[sorted_idx])
+    x_all, y_all, eyl_all, eyh_all, ids = x_all[sorted_idx], y_all[sorted_idx], eyl_all[sorted_idx], eyh_all[sorted_idx], ids[sorted_idx]
     ## find the idx of lowest and highest elements to include
     lo_idx = np.searchsorted(x_all, plot_lo, side='left')
     hi_idx = np.searchsorted(x_all, plot_hi, side='left')
@@ -164,6 +165,7 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
     grid = np.linspace(plot_lo - 0.05, plot_hi + 0.05, 5000)
     kinematics = precompute_kinematics(grid, setup)
     Rtot, Rres, Rbg = R_model_separated(bare_masses, g, c, baseline, kinematics, setup)
+    Rtot, Rres, Rbg = Rtot.real, Rres.real, Rbg.real
 
     ##  - calculate pull distribution
     ## calculate model value at each datapoint for pulls
@@ -182,28 +184,32 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
 
     ##  - plot the data
     markers = ['o', 'v', 's', 'P', '*'] ## expect less than 5 sources for now
-    datacolours = ['black', 'indigo', 'mediumblue'] ## expect less than 5 sources for now
+    datacolours = ['black', 'midnightblue', 'indigo'] ## expect less than 5 sources for now
     for this_id in unique_ids: ## assume the ids are [0, 1, 2,....] as set up to be like this
         this_idx = np.where(ids==this_id)
-        this_sourcetex = config["source_tex"][int(this_id)]
+        this_sourcetex = plot_cfg["source_tex"][int(this_id)]
         this_x, this_y, this_eyl, this_eyh = x[this_idx], y[this_idx], eyl[this_idx], eyh[this_idx]
         ax.errorbar(this_x, this_y, yerr=[this_eyl, this_eyh], fmt=markers[int(this_id)], ms=4, color=datacolours[int(this_id)],
                     elinewidth=0.8, capsize=1.5, zorder=50, label="data ({source})".format(source=this_sourcetex))
 
     ##  - plot the model
-    ax.plot(grid, Rbg, "--", color="lightseagreen", lw=1.3,
+    ## (split grid up into inside and outside the fit range)
+    fit_lo, fit_hi = config["fit"]["fit_range"]["low"], config["fit"]["fit_range"]["high"]
+    mask_low, mask_mid, mask_hi = grid<fit_lo, (grid>=fit_lo) & (grid<=fit_hi), grid>fit_hi
+    ax.plot(grid, Rbg, "-.", color="mediumorchid", lw=1.3,
             label=r"non-resonant contribution")
-    ax.plot(grid, Rres, "--", color="forestgreen", lw=1.3,
-            label=r"resonant contribution")
-    ax.plot(grid, [baseline]*len(grid), ":", color="violet", lw=1.2, label="light-quark baseline")
-    ax.plot(grid, Rtot, "-", color="mediumvioletred", lw=2.1, zorder=60,
-            label=r"K-matrix fit")
-            # label=r"K-matrix fit ($\chi^2/\mathrm{ndf}=%.2f$)" % (m.fval/(len(x)-m.nfit)))
+    ax.plot(grid, Rres, "--", color="mediumpurple", lw=1.3, label=r"resonant contribution")
+    ax.plot(grid, [baseline]*len(grid), ":", color="mediumvioletred", lw=1.2, label="light-quark baseline")
+    ax.plot(grid[mask_mid], Rtot[mask_mid], "-", color="deeppink", lw=2.1, zorder=60, label=r"Fit result")
+    ax.plot(grid[mask_low], Rtot[mask_low], "-", color="deeppink", alpha=0.5, lw=2.1, zorder=60)
+    ax.plot(grid[mask_hi], Rtot[mask_hi], "-", color="deeppink", alpha=0.5, lw=2.1, zorder=60)
 
     ax.set_xlim(plot_lo, plot_hi)
     ymin, ymax = ax.get_ylim()
-    # ax.set_ylim(ymin, ymin + (ymax - ymin) * 1.18)   ## headroom for the labels below
-    ax.set_ylim(1.85, 5.4) ## to match prev code
+    ymax = plot_cfg["limits"].get("vmax", ymin + (ymax - ymin) * 1.18)
+    ymin = plot_cfg["limits"].get("vmin", ymin)
+    ax.set_ylim(ymin, ymax)
+    # ax.set_ylim(1.85, 5.4) ## to match prev code
 
     zorder=0
     first_loop=True
@@ -232,11 +238,11 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
             if (val<plot_lo) or (val>plot_hi):
                 print(f"\033[1;93m[REPORT INFO]\033[0m resonance {name} with {val} is out of plot range [{plot_lo}, {plot_hi}], omitting from plot")
             else:
-                ax.axvline(val, color="darkorange", ls=":", lw=0.8, zorder=zorder)
-                # ax.text(val, ax.get_ylim()[1] * 0.995, "$"+name+"$", ha="right", va='top', fontsize=11, color="darkorange")
+                ax.axvline(val, color="yellowgreen", ls="--", lw=0.8, zorder=zorder)
+                # ax.text(val, ax.get_ylim()[1] * 0.995, "$"+name+"$", ha="right", va='top', fontsize=11, color="yellowgreen")
                 ax.text(
                     val, ax.get_ylim()[1] * 0.99,"$"+name+"$", 
-                    ha="center", va="top", fontsize=11, color="darkorange",
+                    ha="center", va="top", fontsize=11, color="yellowgreen",
                     bbox=dict(facecolor="white", edgecolor="none", pad=1), zorder=zorder
                 )
         zorder+=1
@@ -245,10 +251,7 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
     ax.set_ylabel(r"$R = \sigma_{\rm had}/\sigma_{\mu\mu}$")
     ax.set_title(f"Coupled-channel K-matrix fit ({setup.N_ch} channels, "
                     f"{len(param_spec.res_mass_idx)} resonances)")
-    if plot_lo >= 3.55:
-        ax.legend(loc="lower right")
-    else:
-        ax.legend(loc="upper left")
+    ax.legend(loc="upper right")
 
     # axis[1].bar(data_edges[:-1], pulls, width=0.8*data_widths, color=pull_colours,
                 # align='edge', edgecolor="none", zorder=5)
@@ -261,8 +264,11 @@ def make_plot(m, param_spec, setup, data, config, ids, out_pdf=None):
     axis[1].set_xlim(plot_lo, plot_hi)
     axis[1].set_xlabel(r"$\sqrt{s}$  [GeV]", loc='right')
 
-    fval_annotation = r"  $\chi^{2}$     : "+f"{m.fval:.2f}\n"+r"$\chi^{2}$/ndof :    "+f"{m.fval/(len(x_all) - m.nfit):.2f}"
-    axis[0].annotate(fval_annotation, (0.98,0.97), xycoords='axes fraction', va='top', ha='right', fontsize=13)
+    try:
+        fval_annotation = r"  $\chi^{2}$     : "+f"{m.fval:.2f}\n"+r"$\chi^{2}$/ndof :    "+f"{m.fval/(len(x_all) - m.nfit):.2f}"
+        axis[0].annotate(fval_annotation, (0.98,0.97), xycoords='axes fraction', va='top', ha='right', fontsize=13)
+    except TypeError:
+        print(f"\033[1;93m[REPORT WARNING]\033[0m Unable to find fit quality metrics from minuit object, omitting annotation")
 
     fig.subplots_adjust(left=0.08, right=0.98, top=0.94, bottom=0.08, hspace=0.06)
 

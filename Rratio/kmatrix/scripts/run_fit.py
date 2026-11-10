@@ -42,8 +42,7 @@ if __name__ == "__main__":
     makedirs(today+'/'+outfolder, exist_ok=True)
 
     ## load the data
-    x, y, eyl, eyh, source_ids = load_data(rootfiles, config['fit']['fit_range'], return_id=True)
-    data = x, y, eyl, eyh
+    data = load_data(rootfiles, config['fit']['fit_range'], return_id=False)
 
     ## setup fitter
     fit_cfg = config.get("fit", {})
@@ -69,7 +68,7 @@ if __name__ == "__main__":
     save_conditions(param_spec, setup,  config['fit']['fit_range'], out_txt=f"{today}/{outfolder}/fit_conditions.txt")
     report(best, fitter.status, param_spec, data, out_txt=f"{today}/{outfolder}/fit_result.txt")
     limit_warning(best, param_spec) ## after the above function as report is a big chunk of text in the terminal
-    make_plot(best, param_spec, setup, data, config["plotting"], source_ids, out_pdf=f"{today}/{outfolder}/fit_result.pdf")
+    make_plot(best, param_spec, setup, data, config, out_pdf=f"{today}/{outfolder}/fit_result.pdf")
     couplings_plot(best, param_spec, setup, config['plotting'], vmax=max_coupling, out_pdf=f"{today}/{outfolder}/couplings.pdf")
     nonresonant_plot(best, param_spec, setup, config['plotting'], vmax=max_coupling, out_pdf=f"{today}/{outfolder}/nonresonant.pdf")
     plot_covariance(best, param_spec, out_pdf=f"{today}/{outfolder}/correlations.pdf")

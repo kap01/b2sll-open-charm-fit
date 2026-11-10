@@ -78,7 +78,7 @@ class ParameterSpec:
         return bare_masses, g, c, baseline
 
     def kind_of(self, i):
-        """'mass', 'baseline', or 'coupling' -- used to pick a jitter size
+        """'mass', 'baseline', 'non_res' or 'coupling' -- used to pick a jitter size
         for restart k>0 in KMatrixFit.run()."""
         if i == self.baseline_idx:
             return "baseline"
@@ -238,7 +238,7 @@ class KMatrixFit:
         # if self.minuit is None:
         #     raise RuntimeError("call setup() before run()")
 
-        jitter = jitter or {"mass": 0.02, "coupling": 0.4, "baseline": 0.0}
+        jitter = jitter or {"mass": 0.02, "coupling": 0.4, "baseline": 0.0, "non_res":0.05}
         rng = np.random.default_rng(seed)
         base_start = np.array(self.param_spec.start, dtype=float)
 
