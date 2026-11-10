@@ -1,8 +1,10 @@
 Rratio/kmatrix/src/__pycache__
 Rratio/kmatrix/src/__pycache__/*
 Rratio/kmatrix/includes
+Rratio/kmatrix/config/*/
 *.pyc
 *_old.py
+*.old
 *_dev.py
 *_new.py
 *.root
